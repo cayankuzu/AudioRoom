@@ -172,23 +172,36 @@ export function createFigure(
   let figureHeadLocalY = COMPOSITION.figureHeadLocalY;
 
   const loader = new GLTFLoader();
+  console.log("[Figür] GLB yükleniyor:", MODEL_URL);
   loader.load(
     MODEL_URL,
     (gltf) => {
       const model = gltf.scene;
+      let meshCount = 0;
       model.traverse((node) => {
         const mesh = node as THREE.Mesh;
         if (!mesh.isMesh) return;
+        meshCount += 1;
         mesh.castShadow = true;
         mesh.receiveShadow = false;
+        mesh.frustumCulled = false;
         /** Figür TEXT layer'ında DEĞİL — textFill ve textBoost onu etkilemez. */
         mesh.layers.set(LAYER.DEFAULT);
         const tint = (material: THREE.MeshStandardMaterial) => {
-          material.color = new THREE.Color("#030305");
-          material.roughness = 0.98;
-          material.metalness = 0.03;
+          /** Silüet: orijinal texture varsa hafif koyult; yoksa düz koyu. */
+          if (material.map) {
+            material.color = new THREE.Color("#2a2a2c");
+          } else {
+            material.color = new THREE.Color("#0a0a0c");
+          }
+          material.roughness = 0.95;
+          material.metalness = 0.04;
           material.emissive = new THREE.Color("#000000");
           material.emissiveIntensity = 0;
+          material.transparent = false;
+          material.depthWrite = true;
+          material.side = THREE.FrontSide;
+          material.needsUpdate = true;
         };
         const m = mesh.material as
           | THREE.MeshStandardMaterial
@@ -198,12 +211,13 @@ export function createFigure(
         else if (m) tint(m);
       });
 
+      /** Ölçekleme: referans Y (figür boyu), diyagonal değil. */
       const bounds = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
       bounds.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const targetHeight = 2.45;
-      const scale = targetHeight / maxDim;
+      const modelHeight = size.y > 0.01 ? size.y : Math.max(size.x, size.z, 1);
+      const targetHeight = 2.8;
+      const scale = targetHeight / modelHeight;
       model.scale.setScalar(scale);
 
       /** XZ merkezine hizala — GLB pivot off ise düzeltir. */
@@ -219,10 +233,23 @@ export function createFigure(
       figureHeadLocalY = targetHeight * 0.92;
       /** Sun target'ı gerçek head Y'ye güncelle. */
       lightTarget.position.y = COMPOSITION.figureWorldLift + figureHeadLocalY;
+      console.log("[Figür] GLB yüklendi", {
+        meshes: meshCount,
+        targetHeight: targetHeight.toFixed(2),
+        originalY: size.y.toFixed(2),
+        scale: scale.toFixed(3),
+      });
     },
-    undefined,
-    () => {
-      /* fallback kalır */
+    (progress) => {
+      if (progress.lengthComputable && progress.total > 0) {
+        const pct = Math.round((progress.loaded / progress.total) * 100);
+        if (pct === 25 || pct === 50 || pct === 75 || pct === 100) {
+          console.log(`[Figür] yükleniyor… %${pct}`);
+        }
+      }
+    },
+    (err) => {
+      console.error("[Figür] GLB yüklenemedi — fallback aktif:", err);
     },
   );
 
