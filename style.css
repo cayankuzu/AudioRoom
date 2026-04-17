@@ -2278,11 +2278,13 @@ body.is-touch .bright-panel {
   display: none !important;
 }
 
-/* Minimap — SOL ÜST, toolbar'ın ALTINDA. Toolbar 44-52px'lik merkez
- * pill olduğu için sol kenar boşta. Tıkabiliriz. */
+/* Minimap — SOL ÜST, toolbar + banner'ın ALTINDA.
+ * Y-offset = safe-top + toolbar(~50) + banner(~30) + gap(~8) = ~88px.
+ * Banner kısa süreli belirse bile minimap/album'ün üstünde kalır.
+ */
 body.is-touch .minimap {
   left: max(0.35rem, env(safe-area-inset-left));
-  top: calc(max(0.35rem, env(safe-area-inset-top)) + 54px);
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 88px);
   bottom: auto;
   right: auto;
   width: 128px;
@@ -2318,12 +2320,12 @@ body.is-touch .minimap__canvas {
 body.is-touch .album-panel {
   left: auto;
   right: max(0.35rem, env(safe-area-inset-right));
-  top: calc(max(0.35rem, env(safe-area-inset-top)) + 54px);
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 88px);
   bottom: auto;
   width: min(240px, 62vw);
   min-width: 180px;
   max-height: calc(
-    100dvh - max(0.35rem, env(safe-area-inset-top)) - 54px - 170px
+    100dvh - max(0.35rem, env(safe-area-inset-top)) - 88px - 170px
   );
   display: flex;
   flex-direction: column;
@@ -2597,15 +2599,15 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
     width: min(220px, 58vw);
     right: max(0.35rem, env(safe-area-inset-right));
     left: auto;
-    top: calc(max(0.35rem, env(safe-area-inset-top)) + 56px);
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 90px);
     max-height: calc(
-      100dvh - max(0.35rem, env(safe-area-inset-top)) - 56px - 182px
+      100dvh - max(0.35rem, env(safe-area-inset-top)) - 90px - 182px
     );
   }
 
   body.is-touch .minimap {
     width: 118px;
-    top: calc(max(0.35rem, env(safe-area-inset-top)) + 56px);
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 90px);
   }
 
   /* Dikey telefonda (dar) — interaction hint d-pad/action üstünde duruyor
@@ -2693,7 +2695,7 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
 
   body.is-touch .minimap {
     width: 110px;
-    top: calc(max(0.3rem, env(safe-area-inset-top)) + 44px);
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 78px);
   }
 
   body.is-touch .album-panel {
@@ -2701,9 +2703,9 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
     min-width: 170px;
     right: max(0.3rem, env(safe-area-inset-right));
     left: auto;
-    top: calc(max(0.3rem, env(safe-area-inset-top)) + 44px);
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 78px);
     max-height: calc(
-      100dvh - max(0.3rem, env(safe-area-inset-top)) - 44px - 148px
+      100dvh - max(0.3rem, env(safe-area-inset-top)) - 78px - 148px
     );
   }
 
