@@ -1,0 +1,20 @@
+{
+  "name": "redd-mukemmel-bosluk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.4"
+  },
+  "dependencies": {
+    "three": "^0.184.0",
+    "troika-three-text": "^0.52.4"
+  }
+}

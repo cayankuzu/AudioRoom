@@ -1,0 +1,960 @@
+:root {
+  font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  color: #ececec;
+  background: #080808;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 18%, #242424 0%, #0c0c0c 55%, #050505 100%);
+  color: #ececec;
+  overflow: hidden;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.landing {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2.4rem;
+  align-items: center;
+  padding: 6vh 7vw;
+}
+
+.landing__kicker {
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a7a7a7;
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+}
+
+.landing h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5.4vw, 4.2rem);
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+
+.landing__desc {
+  max-width: 52ch;
+  color: #a7a7a7;
+  line-height: 1.7;
+  margin-top: 1rem;
+}
+
+.album-card {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  background: rgba(14, 14, 14, 0.75);
+  backdrop-filter: blur(6px);
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.album-card:hover {
+  transform: translateY(-4px);
+  border-color: #4d4d4d;
+}
+
+.album-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.album-card__meta p {
+  margin: 0;
+  color: #a3a3a3;
+}
+
+.album-card__meta h2 {
+  margin: 0.35rem 0 1.3rem;
+  font-weight: 500;
+}
+
+.enter-btn {
+  border: 1px solid #555;
+  background: #111;
+  color: #f4f4f4;
+  padding: 0.8rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.enter-btn:hover {
+  border-color: #9d9d9d;
+}
+
+#experience {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#experience canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  transition: opacity 0.35s ease, background 0.35s ease;
+  z-index: 50;
+}
+
+/** İlk giriş: tam ekran karanlık backdrop. */
+.start-overlay.is-first {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 2, 4, 0.72) 0%,
+    rgba(2, 2, 4, 0.88) 55%,
+    rgba(0, 0, 0, 0.96) 100%
+  );
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+/**
+ * ESC sonrası pause modu: backdrop SAYDAM ve pointer-events: none.
+ * Böylece arka plandaki UI panelleri (Kontroller, Harita, Albüm)
+ * tıklanabilir kalır; yalnız pause kartı kendi pointer-events: auto
+ * ile tıklanabilir olur.
+ */
+.start-overlay.is-pause {
+  background: transparent;
+  pointer-events: none;
+  backdrop-filter: none;
+}
+
+.start-overlay.is-pause .start-overlay__card {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.start-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.start-overlay__card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(16, 16, 18, 0.92), rgba(8, 8, 10, 0.92));
+  padding: 2rem 2.4rem 2.1rem;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 500px;
+  box-shadow: 0 40px 96px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(244, 214, 117, 0.06) inset;
+  backdrop-filter: blur(18px);
+  display: none;
+}
+
+/** İlk giriş — zengin onboarding kartı. */
+.start-overlay.is-first [data-card="intro"] {
+  display: block;
+}
+
+/** ESC sonrası — minimal pause kartı. */
+.start-overlay.is-pause [data-card="pause"] {
+  display: block;
+}
+
+.start-overlay__card--pause {
+  max-width: 340px;
+}
+
+.start-overlay__kicker {
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #a3a3a3;
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+}
+
+.start-overlay h2 {
+  margin: 0 0 0.85rem;
+  font-weight: 300;
+  font-size: 1.75rem;
+  letter-spacing: 0.01em;
+  color: #f6f6f6;
+}
+
+.start-overlay__desc {
+  color: #b1b1b1;
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.start-overlay__controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem 0.75rem;
+  margin: 0 auto 1.1rem;
+  max-width: 340px;
+}
+
+.start-overlay__ctrl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.65rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-size: 0.76rem;
+  color: #cfcfcf;
+}
+
+.start-overlay__ctrl span {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #f4d675;
+}
+
+.start-overlay__ctrl em {
+  font-style: normal;
+  color: #9a9a9a;
+}
+
+.start-overlay__cta {
+  margin: 0.2rem auto 0;
+  padding: 0.7rem 1.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 214, 117, 0.55);
+  background: linear-gradient(180deg, rgba(244, 214, 117, 0.2), rgba(244, 214, 117, 0.08));
+  color: #f4eccf;
+  font-size: 0.88rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.start-overlay__cta:hover {
+  background: linear-gradient(180deg, rgba(244, 214, 117, 0.32), rgba(244, 214, 117, 0.14));
+  border-color: rgba(244, 214, 117, 0.8);
+  transform: translateY(-1px);
+}
+
+.start-overlay__note {
+  margin: 1rem 0 0;
+  font-size: 0.72rem;
+  color: #7a7a7a;
+  letter-spacing: 0.04em;
+  font-style: italic;
+}
+
+.hud {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(8, 8, 8, 0.62);
+  border: 1px solid #262626;
+  padding: 0.55rem 0.85rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  min-width: 210px;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+  transition: padding 0.2s ease, min-width 0.2s ease;
+}
+
+.hud__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.hud__kicker {
+  margin: 0;
+  letter-spacing: 0.25em;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #a0a0a0;
+}
+
+.hud__collapse {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #303030;
+  color: #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.hud__collapse:hover {
+  border-color: #5a5a5a;
+}
+
+.hud.is-collapsed {
+  min-width: 130px;
+  padding: 0.45rem 0.7rem 0.55rem;
+}
+
+.hud.is-collapsed .hud__body {
+  display: none;
+}
+
+.hud.is-collapsed .hud__head {
+  margin-bottom: 0;
+}
+
+.hud__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.14rem 0;
+  color: #cfcfcf;
+}
+
+.hud__row span {
+  color: #e2e2e2;
+}
+
+.hud__row em {
+  color: #8e8e8e;
+  font-style: normal;
+}
+
+.hud__divider {
+  height: 1px;
+  margin: 0.5rem 0 0.45rem;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.hud__row--hint span {
+  color: #f4d675;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.hud__row--hint em {
+  color: #bdb49a;
+  font-size: 0.72rem;
+}
+
+/* ========================
+   YouTube albüm paneli
+   ======================== */
+.album-panel {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(360px, 42vw);
+  min-width: 260px;
+  background: rgba(10, 10, 12, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  z-index: 5;
+  transition: width 0.25s ease, height 0.25s ease;
+}
+
+.album-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(14, 14, 16, 0.8);
+}
+
+.album-panel__titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.album-panel__kicker {
+  margin: 0;
+  letter-spacing: 0.2em;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: #a3a3a3;
+}
+
+.album-panel__title {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #f3f3f3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-panel__meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9b9b9b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-panel__collapse {
+  flex-shrink: 0;
+  background: rgba(20, 20, 22, 0.9);
+  border: 1px solid #303030;
+  color: #e0e0e0;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: grid;
+  place-content: center;
+  padding: 0;
+}
+
+.album-panel__collapse:hover {
+  border-color: #555;
+}
+
+.album-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem 0.7rem;
+}
+
+.album-panel.is-collapsed .album-panel__body {
+  display: none;
+}
+
+.album-panel__frame-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.album-panel__frame {
+  position: absolute;
+  inset: 0;
+}
+
+.album-panel__frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* iframe tıklamalarını kapat — tüm kontrol panel butonlarından gider. */
+.album-panel__blocker {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: default;
+}
+
+.album-panel__fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  text-align: center;
+  background: rgba(6, 6, 8, 0.82);
+  color: #e8e8e8;
+  font-size: 0.78rem;
+}
+
+.album-panel__fallback.is-visible {
+  display: flex;
+}
+
+.album-panel__fallback p {
+  margin: 0;
+  color: #c9c9c9;
+}
+
+.album-panel__fallback-btn {
+  background: #f3f3f3;
+  color: #111;
+  border: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.album-panel__fallback a {
+  color: #9db5ff;
+  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.album-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.album-panel__btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #2e2e2e;
+  color: #ededed;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  line-height: 1;
+  padding: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.album-panel__btn:hover {
+  border-color: #6f6f6f;
+  background: rgba(28, 28, 30, 0.95);
+}
+
+.album-panel__btn--primary {
+  width: 40px;
+  height: 40px;
+  background: rgba(240, 240, 240, 0.9);
+  color: #111;
+  border-color: rgba(240, 240, 240, 0.9);
+}
+
+.album-panel__btn--primary:hover {
+  background: #fff;
+  border-color: #fff;
+}
+
+.album-panel__play,
+.album-panel__pause {
+  display: inline-block;
+}
+
+.album-panel .album-panel__pause {
+  display: none;
+}
+
+.album-panel.is-playing .album-panel__play {
+  display: none;
+}
+
+.album-panel.is-playing .album-panel__pause {
+  display: inline-block;
+}
+
+.album-panel__volume {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.album-panel__volume input[type="range"] {
+  width: 90px;
+  accent-color: #dcdcdc;
+}
+
+.album-panel__tracks {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.album-panel__tracks-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.15rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #9a9a9a;
+}
+
+.album-panel__count {
+  color: #777;
+  letter-spacing: 0.12em;
+}
+
+.album-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a transparent;
+}
+
+.album-panel__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.album-panel__list::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.album-panel__track {
+  display: grid;
+  grid-template-columns: 28px 1fr 16px;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #d6d6d6;
+  font-size: 0.78rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.album-panel__track:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.album-panel__track.is-active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.album-panel__track-index {
+  color: #7a7a7a;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.album-panel__track.is-active .album-panel__track-index {
+  color: #bdbdbd;
+}
+
+.album-panel__track-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-panel__track-state {
+  text-align: right;
+  color: #d8d8d8;
+  font-size: 0.78rem;
+}
+
+.album-panel__empty {
+  padding: 0.55rem 0.5rem;
+  color: #8a8a8a;
+  font-size: 0.78rem;
+}
+
+.album-panel__track.is-pending {
+  opacity: 0.72;
+}
+
+.album-panel__track.is-pending .album-panel__track-title {
+  color: #9a9a9a;
+}
+
+.album-panel__track.is-missing {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.album-panel__track.is-missing:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.album-panel__track.is-missing .album-panel__track-title {
+  color: #6b6b6b;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.album-panel__track.is-missing .album-panel__track-state {
+  color: #5a2e30;
+}
+
+/* ========================
+   Etkileşim ipucu (merkez alt)
+   ======================== */
+.interaction-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 19vh;
+  transform: translate(-50%, 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.85rem 0.5rem;
+  background: rgba(8, 8, 10, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: #ededed;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.18s ease;
+  z-index: 4;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.interaction-hint.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.interaction-hint__key {
+  display: inline-grid;
+  place-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 0.45rem;
+  background: #f4d675;
+  color: #201509;
+  border-radius: 7px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.82rem;
+  box-shadow: 0 0 0 1px rgba(255, 214, 117, 0.35);
+}
+
+.interaction-hint__text {
+  color: #ebebeb;
+}
+
+/* ========================
+   Minimap — SOL ALT KÖŞE.
+   Kapatılınca yalnız ince header bar kalır (Harita · +).
+   ======================== */
+.minimap {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  width: 204px;
+  background: rgba(10, 10, 12, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.5rem 0.55rem 0.55rem;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  transition: width 0.25s ease, padding 0.25s ease;
+}
+
+.minimap__head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0 0.25rem 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a1a1a1;
+}
+
+.minimap__scale {
+  color: #7e7e7e;
+  letter-spacing: 0.12em;
+}
+
+.minimap__collapse {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #303030;
+  color: #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1;
+  padding: 0;
+  letter-spacing: 0;
+}
+
+.minimap__collapse:hover {
+  border-color: #5a5a5a;
+}
+
+.minimap__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: transparent;
+}
+
+/**
+ * Tamamen kapalı durum: yalnız "Harita · +" bar kalır, başka hiçbir
+ * şey görünmez. HUD paneliyle aynı davranış.
+ */
+.minimap.is-collapsed {
+  width: auto;
+  min-width: 120px;
+  padding: 0.45rem 0.7rem 0.5rem;
+}
+
+.minimap.is-collapsed .minimap__canvas,
+.minimap.is-collapsed .minimap__scale {
+  display: none !important;
+}
+
+.minimap.is-collapsed .minimap__head {
+  padding-bottom: 0;
+  grid-template-columns: 1fr auto;
+  margin-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+  .minimap {
+    width: 180px;
+  }
+}
+
+@media (max-width: 760px) {
+  .minimap {
+    width: 160px;
+  }
+}
+
+/* ========================
+   Sağ üst — parlaklık paneli
+   ======================== */
+.bright-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 6;
+  background: rgba(10, 10, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
+  min-width: 190px;
+}
+
+.bright-panel__label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.bright-panel__kicker {
+  font-size: 0.64rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #b9b9b9;
+}
+
+.bright-panel__slider {
+  width: 100%;
+  accent-color: #e4e4e4;
+  cursor: pointer;
+}
+
+.bright-panel__value {
+  font-size: 0.72rem;
+  color: #d0d0d0;
+  min-width: 3.2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .bright-panel {
+    top: 0.6rem;
+    right: 0.6rem;
+    min-width: 170px;
+  }
+
+  .landing {
+    grid-template-columns: 1fr;
+    padding-top: 4rem;
+  }
+  .album-card {
+    grid-template-columns: 1fr;
+  }
+  .album-panel {
+    width: min(92vw, 360px);
+    right: 0.6rem;
+    bottom: 0.6rem;
+  }
+  .hud {
+    font-size: 0.72rem;
+    min-width: 170px;
+  }
+}
