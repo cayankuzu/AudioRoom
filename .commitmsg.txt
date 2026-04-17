@@ -1,9 +1,0 @@
-feat: ekran goruntusu + paylas butonlari (parlaklik panelinin altinda)
-
-- Yeni src/ui/captureControls.ts: sag ust kosede parlaklik panelinin ALTINDA iki minimal buton.
-- Ekran goruntusu: renderer canvas.toDataURL -> modal onizleme + PNG indirme (otomatik zaman damgali dosya adi) + panoya kopyalama (destekleyen tarayicida).
-- renderer.ts'e preserveDrawingBuffer: true eklendi (toDataURL guvenilirligi).
-- Paylas: navigator.share destekleniyorsa native paylasim sheet; yoksa navigator.clipboard ve execCommand fallback ile URL kopyalama + toast.
-- index.html icine OG + Twitter Card meta etiketleri eklendi (paylasim onizlemesi icin baslik, aciklama, og:image).
-- Turkce metinler ve erisim duzeni: Escape ile modal kapanir, backdrop tiklanabilir, pointer-lock korunur.
-- Responsive: 900px alti icin kucuk ekran konumlandirma.
