@@ -3,7 +3,7 @@ import * as THREE from "three";
 export interface InteractableDescriptor {
   kind: "vinyl" | "gramophone";
   vinylOrder?: number;
-  promptKey: "E" | "Y";
+  promptKey: "E" | "Q";
   promptText: string;
 }
 
@@ -17,10 +17,15 @@ export interface InteractionTarget {
 export interface InteractionCallbacks {
   onCollectVinyl(order: number): void;
   onGramophoneE(): void;
-  onGramophoneY(): void;
   /**
-   * G tuşu — elde tutulan plağı bırakma. Hedefe bakmak gerekmez; oyuncu
-   * taşıdığı plağı dünyaya (önünde-ayağında) düşürmek ister.
+   * R tuşu — yalnızca gramofon hedefteyken tetiklenir. Plak takılıysa
+   * çalıyorsa durdurur, duraklatılmışsa devam ettirir.
+   */
+  onGramophoneR(): void;
+  /**
+   * Q tuşu — elde tutulan plağı / taşınan gramofonu bırakma.
+   * Hedefe bakmaya gerek yok; her yerde çalışır. Elde bir şey yoksa
+   * callback sessizce no-op yapar.
    */
   onDropCarried(): void;
 }
@@ -38,8 +43,8 @@ export interface InteractionSystem {
  *  1) Önce kamera önünde koni (forward vektör) içindeki objeleri filtreler
  *     (dot > 0.55 ≈ ±56°'lik koni).
  *  2) Sonra koni içindeki en yakın objeyi döner (maxRange içinde).
- *  3) E ve Y tuşları için key-binding dinler; basıldığında hedef
- *     descriptor'una göre callback çağırır.
+ *  3) E tuşu hedefe göre pickup/gramofon; Q tuşu hedef aranmadan
+ *     elde/taşınanı bırakma callback'ini çağırır.
  */
 export function createInteractionSystem(
   callbacks: InteractionCallbacks,
@@ -66,17 +71,21 @@ export function createInteractionSystem(
       } else if (d.kind === "gramophone") {
         callbacks.onGramophoneE();
       }
-    } else if (e.code === "KeyY") {
+    } else if (e.code === "KeyR") {
       /**
-       * Y her durumda gramofon toggle — hedefe bakmasa bile taşıyorsa
-       * bırakabilmeli. Aksi halde "taşıyorsam hiçbir şeye bakmıyorum"
-       * durumunda kilitleniriz.
+       * R — yalnızca gramofon hedefteyken play/pause toggle. Hedef yoksa
+       * sessizce görmezden gel (oynatma kontrolü global değil; oyuncu
+       * gramofonun yanına gelmeli).
        */
-      callbacks.onGramophoneY();
-    } else if (e.code === "KeyG") {
+      if (!current) return;
+      if (current.descriptor.kind === "gramophone") {
+        callbacks.onGramophoneR();
+      }
+    } else if (e.code === "KeyQ") {
       /**
-       * G — elde tutulan plağı bırak. Hedefe bakma zorunluluğu yok;
-       * her yerde çalışır. Elde plak yoksa callback sessizce no-op yapar.
+       * Q — elde tutulan plağı ya da taşınan gramofonu bırak. Hedefe
+       * bakmak gerekmez; her yerde çalışır. Elde hiçbir şey yoksa callback
+       * sessizce no-op yapar.
        */
       callbacks.onDropCarried();
     }

@@ -158,9 +158,33 @@ export function startExperience(container: HTMLElement): void {
   const flashlight = createFlashlightSystem(camera);
   const audioDistance = createAudioDistanceSystem();
 
-  createHud(container);
+  const hud = createHud(container);
   const startOverlay = createStartOverlay(container);
-  const albumPanel = createAlbumPlayerPanel(container, inventory);
+  const albumPanel = createAlbumPlayerPanel(container, inventory, {
+    /**
+     * Paneldeki ⏏ butonu ile bir plak koleksiyondan çıkarıldığında
+     * dünyaya geri düşür. Inventory mutation ve playback pause zaten
+     * panel içinde yapılıyor; burada yalnızca plağın dünya mesh'ini
+     * yeniden görünür kıl ve gramofonun HEMEN önüne yerleştir ki
+     * oyuncu kolayca tekrar alabilsin.
+     */
+    onEjectRecord(order) {
+      const spawn = vinylSystem.getSpawn(order);
+      if (!spawn) return;
+      const gramPos = new THREE.Vector3();
+      gramophone.worldPosition(gramPos);
+      /**
+       * Gramofonun ön tarafına küçük, belirli bir ofsetle düşür. Kamera
+       * yönü belli değilse (panelden çıkarıldığı için), gramofonun yerel
+       * forward'ını kullanmak yerine sabit bir dünya ofseti veriyoruz —
+       * bu, farklı session'lar arasında tutarlı ve görünür bir konum
+       * sağlar. Y, vinylSystem.dropAt içinde terrain'den sample edilir.
+       */
+      const drop = gramPos.clone().add(new THREE.Vector3(0.7, 0, 0.7));
+      vinylSystem.dropAt(order, drop);
+      console.log("[Plak]", `Çıkarıldı (panel) → order=${order} "${spawn.title}"`);
+    },
+  });
   const brightness = createBrightnessControl(container);
   /**
    * Parlaklık panelinin ALTINDA konumlanır (CSS'te `.capture-panel` ile).
@@ -199,7 +223,7 @@ export function startExperience(container: HTMLElement): void {
     return dropVec;
   }
 
-  /** --- Interaction: E (topla / kullan), Y (gramofon taşı) --- */
+  /** --- Interaction: E (al / kullan), Q (elindekini bırak) --- */
   const interaction = createInteractionSystem({
     onCollectVinyl(order) {
       /**
@@ -231,22 +255,19 @@ export function startExperience(container: HTMLElement): void {
     },
     onGramophoneE() {
       /**
-       * Gramofon ile etkileşim:
-       *  1. Elde plak varsa → GRAMOFONA YERLEŞTİR. Gramofonda eski plak varsa
-       *     swap edilir (eski plak ele döner). İlk kez yerleştirilen plak
-       *     `collected` setine eklenir → panel listesinde görünür → müzik başlar.
-       *  2. Elde plak YOKSA ve gramofonda takılı plak varsa → play/pause toggle.
-       *  3. Elde de gramofonda da hiçbir şey yoksa → sessiz no-op (prompt zaten bilgilendiriyor).
+       * Gramofon + E — iki davranışa dallanır:
+       *  1. Elde plak varsa → GRAMOFONA YERLEŞTİR. (İlk yerleşimde
+       *     `collected`e eklenir → panel listesinde görünür, müzik başlar.
+       *     Eski plak listede KALIR.)
+       *  2. El boşsa → gramofonu ELE AL (taşımaya başla). Bu durumda
+       *     müziği duraklatma; oyuncu istemiyorsa R ile kapatabilir.
+       *
+       * Play/pause ARTIK E ile değil, R ile yapılır.
        */
       if (inventory.carriedOrder > 0) {
         const result = inventory.placeCarriedOnGramophone();
         if (!result) return;
         const { placed, previousActive } = result;
-        /**
-         * Gramofon mesh state'i ve carry görseli `inventory.onChange` üzerinden
-         * atomik olarak güncellenir (tek emit). Burada yalnızca müziği başlat.
-         * Eski plak (varsa) panel listesinde KALIR — oyuncu ordan tekrar çalabilir.
-         */
         albumPanel.playOrder(placed);
         if (previousActive > 0 && previousActive !== placed) {
           console.log(
@@ -258,25 +279,38 @@ export function startExperience(container: HTMLElement): void {
         }
         return;
       }
-      if (gramophone.activeOrder > 0) {
-        albumPanel.togglePlayback();
-      }
-    },
-    onGramophoneY() {
       gramophone.toggleCarry(camera, terrain.getHeightAt);
+      console.log("[Gramofon]", "Taşımaya alındı (E)");
+    },
+    onGramophoneR() {
+      /**
+       * R — gramofonda plak takılıysa play/pause toggle. Plak yoksa
+       * sessizce no-op.
+       */
+      if (gramophone.activeOrder <= 0) return;
+      albumPanel.togglePlayback();
+      console.log("[Gramofon]", "Play/Pause toggle (R)");
     },
     onDropCarried() {
       /**
-       * G — elde tutulan plağı oyuncunun ayağına bırak.
-       * Envanterden carry düşer, dünya mesh'i geri görünür.
+       * Q — elde/üzerinde tutulanı bırak. Öncelik:
+       *  1. Elde plak varsa → plağı oyuncunun önüne düşür.
+       *  2. Gramofon taşınıyorsa → gramofonu yere koy (slope sampling).
+       *  3. Hiçbiri yoksa sessizce no-op.
        */
       const order = inventory.carriedOrder;
-      if (order <= 0) return;
-      const dropSpot = computeDropSpotNearPlayer();
-      inventory.dropCarry();
-      vinylSystem.dropAt(order, dropSpot);
-      const title = vinylSystem.getSpawn(order)?.title ?? "";
-      console.log("[Plak]", `Bırakıldı (G) → order=${order} "${title}"`);
+      if (order > 0) {
+        const dropSpot = computeDropSpotNearPlayer();
+        inventory.dropCarry();
+        vinylSystem.dropAt(order, dropSpot);
+        const title = vinylSystem.getSpawn(order)?.title ?? "";
+        console.log("[Plak]", `Bırakıldı (Q) → order=${order} "${title}"`);
+        return;
+      }
+      if (gramophone.state === "carried") {
+        gramophone.toggleCarry(camera, terrain.getHeightAt);
+        console.log("[Gramofon]", "Bırakıldı (Q)");
+      }
     },
   });
 
@@ -286,10 +320,36 @@ export function startExperience(container: HTMLElement): void {
     renderer.toneMappingExposure = Math.max(BRIGHTNESS.min, Math.min(BRIGHTNESS.max, exposure));
   });
 
-  /** F tuşu — her basımda tek toggle (edge-detection). */
+  /**
+   * Global klavye kısayolları (edge-detection):
+   *  - F  : fener
+   *  - P  : albüm paneli aç/kapa
+   *  - M  : harita aç/kapa
+   *  - K  : kontroller paneli aç/kapa
+   *
+   * Not: E / Q interactionSystem içinde ayrıca dinlenir; burada onlara
+   * dokunmuyoruz.
+   */
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.code === "KeyF" && !e.repeat) {
-      flashlight.toggle();
+    if (e.repeat) return;
+    /** Bir input veya textarea aktifse kısayolları yut. */
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+      return;
+    }
+    switch (e.code) {
+      case "KeyF":
+        flashlight.toggle();
+        break;
+      case "KeyP":
+        albumPanel.toggle();
+        break;
+      case "KeyM":
+        minimap.toggle();
+        break;
+      case "KeyK":
+        hud.toggle();
+        break;
     }
   };
   document.addEventListener("keydown", onKeyDown);
@@ -353,24 +413,24 @@ export function startExperience(container: HTMLElement): void {
     if (!ud.interactable) return;
     /**
      * Prompt öncelik:
-     *  1. Elde plak varsa → "E — plağı tak (swap varsa bildir)"
-     *  2. Gramofonda plak + çalıyor → "E — duraklat"
-     *  3. Gramofonda plak + durmuş → "E — devam et"
-     *  4. Hiçbir şey yok → "Önce plağını bul"
+     *  1. Elde plak varsa → "E — plağı tak / ekle"
+     *  2. Gramofonda plak + çalıyor → "R — duraklat · E — gramofonu taşı"
+     *  3. Gramofonda plak + durmuş → "R — başlat · E — gramofonu taşı"
+     *  4. Hiçbir şey yok → "E — gramofonu taşı · önce bir plak bul"
      */
     if (inventory.carriedOrder > 0) {
       if (gramophone.activeOrder > 0) {
-        ud.interactable.promptText = "E — plağı ekle (önceki listede kalır) · Y — taşı";
+        ud.interactable.promptText = "E — plağı ekle (önceki listede kalır)";
       } else {
-        ud.interactable.promptText = "E — plağı tak · Y — taşı";
+        ud.interactable.promptText = "E — plağı tak";
       }
     } else if (gramophone.activeOrder > 0) {
       ud.interactable.promptText =
         albumPanel.activeOrder() > 0
-          ? "E — duraklat · Y — taşı"
-          : "E — müziği devam ettir · Y — taşı";
+          ? "R — duraklat · E — gramofonu taşı"
+          : "R — başlat · E — gramofonu taşı";
     } else {
-      ud.interactable.promptText = "Önce bir plak bul · Y — taşı";
+      ud.interactable.promptText = "E — gramofonu taşı · önce bir plak bul";
     }
   }
 
@@ -420,14 +480,14 @@ export function startExperience(container: HTMLElement): void {
       }
       interactionHint.show(target.descriptor.promptKey, target.descriptor.promptText);
     } else if (gramophone.state === "carried") {
-      interactionHint.show("Y", "Gramofonu taşıyorsun · bırakmak için Y");
+      interactionHint.show("Q", "Gramofonu taşıyorsun · bırakmak için Q");
     } else if (inventory.carriedOrder > 0) {
       /**
        * Herhangi bir hedefe bakmıyoruz ama elde plak var — oyuncuya ne
-       * yapabileceğini sessizce hatırlat. Bırakmak için G.
+       * yapabileceğini sessizce hatırlat. Bırakmak için Q.
        */
       const title = vinylSystem.getSpawn(inventory.carriedOrder)?.title ?? "";
-      interactionHint.show("G", `Elinde "${title}" · G ile bırak, gramofona yaklaş`);
+      interactionHint.show("Q", `Elinde "${title}" · Q ile bırak, gramofona yaklaş`);
     } else {
       interactionHint.hide();
     }

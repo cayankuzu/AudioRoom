@@ -1,4 +1,8 @@
 export interface Hud {
+  /** Paneli aç/kapa (klavye kısayolu ile tetikleme için). */
+  toggle(): void;
+  /** Açık mı? */
+  isOpen(): boolean;
   dispose(): void;
 }
 
@@ -18,9 +22,13 @@ export function createHud(parent: HTMLElement): Hud {
       <div class="hud__row"><span>Fare</span><em>Bakış</em></div>
       <div class="hud__row"><span>F</span><em>Fener</em></div>
       <div class="hud__divider"></div>
-      <div class="hud__row"><span>E</span><em>Plağı al / Gramofon</em></div>
-      <div class="hud__row"><span>G</span><em>Eldeki plağı bırak</em></div>
-      <div class="hud__row"><span>Y</span><em>Gramofonu taşı / bırak</em></div>
+      <div class="hud__row"><span>E</span><em>Plak / Gramofonu al · plağı tak</em></div>
+      <div class="hud__row"><span>R</span><em>Gramofon · başlat / duraklat</em></div>
+      <div class="hud__row"><span>Q</span><em>Elindekini bırak</em></div>
+      <div class="hud__divider"></div>
+      <div class="hud__row"><span>P</span><em>Albüm paneli</em></div>
+      <div class="hud__row"><span>M</span><em>Harita</em></div>
+      <div class="hud__row"><span>K</span><em>Kontroller</em></div>
       <div class="hud__divider"></div>
       <div class="hud__row hud__row--hint"><span>ESC</span><em>İmleci serbest bırak</em></div>
     </div>
@@ -29,9 +37,8 @@ export function createHud(parent: HTMLElement): Hud {
 
   const collapseBtn = hud.querySelector<HTMLButtonElement>(".hud__collapse");
   let collapsed = false;
-  collapseBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    collapsed = !collapsed;
+
+  function applyCollapsed() {
     hud.classList.toggle("is-collapsed", collapsed);
     if (collapseBtn) {
       collapseBtn.textContent = collapsed ? "+" : "−";
@@ -41,9 +48,22 @@ export function createHud(parent: HTMLElement): Hud {
         collapsed ? "Paneli büyüt" : "Paneli küçült",
       );
     }
+  }
+
+  collapseBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    collapsed = !collapsed;
+    applyCollapsed();
   });
 
   return {
+    toggle() {
+      collapsed = !collapsed;
+      applyCollapsed();
+    },
+    isOpen() {
+      return !collapsed;
+    },
     dispose() {
       hud.remove();
     },

@@ -87,6 +87,10 @@ export interface AlbumPlayerPanel {
   restart(): void;
   /** Panel'deki aktif track (canonical order, 0 = yok). */
   activeOrder(): number;
+  /** Paneli aç/kapa (klavye kısayolu için). */
+  toggle(): void;
+  /** Panel açık mı (collapsed değilse true). */
+  isOpen(): boolean;
   dispose(): void;
 }
 
@@ -156,9 +160,19 @@ async function fetchVideoTitle(videoId: string): Promise<string | null> {
  * - Panel ses seviyesi (slider) × mesafe kazancı (`setDistanceGain`) =
  *   efektif volume; her ikisi de güncellendiğinde YouTube'a set edilir.
  */
+export interface AlbumPlayerPanelOptions {
+  /**
+   * Bir plak paneldeki "çıkar" butonundan silindiğinde çağrılır. Inventory
+   * güncellemesi panel içinde ATOMIK yapılır; callback yalnızca dünya
+   * tarafındaki yan-etkiler (mesh'i geri dünyaya düşür, log vb.) içindir.
+   */
+  onEjectRecord?: (order: number) => void;
+}
+
 export function createAlbumPlayerPanel(
   parent: HTMLElement,
   inventory: InventoryState,
+  options: AlbumPlayerPanelOptions = {},
 ): AlbumPlayerPanel {
   const shell = document.createElement("section");
   shell.className = "album-panel";
@@ -350,6 +364,30 @@ export function createAlbumPlayerPanel(
     renderTrackList();
   }
 
+  /**
+   * Paneldeki bir parçanın "çıkar" butonuyla inventoryden silinmesini yönetir.
+   *
+   *  - Eğer çıkarılan plak şu an ÇALIYORSA, playback anında pause edilir
+   *    (onStateChange guard'ı da tekrar kontrol edecek, ama oyuncuya
+   *    anlık geri bildirim vermek için burada erken pauselüyoruz).
+   *  - Inventory.eject çağrısı ile `collected` setinden çıkar ve (aktifse)
+   *    `activeOrder` sıfırlanır. `onChange` listener panelin re-render'ını
+   *    ve gramofon mesh'ini senkronize eder.
+   *  - Son olarak `onEjectRecord` callback'i tetiklenir — dünya tarafındaki
+   *    yan etkiler (plağı yere bırak) için.
+   */
+  function handleEject(order: number): void {
+    const result = inventory.eject(order);
+    if (!result) return;
+    if (result.wasActive && player && playbackState.ready) {
+      safeCall(() => player!.pauseVideo(), undefined);
+      safeCall(() => player!.seekTo(0, true), undefined);
+      updatePlayingUi(false);
+      setProgress(0, getKnownDuration());
+    }
+    options.onEjectRecord?.(order);
+  }
+
   function renderTrackList(): void {
     listEl!.innerHTML = "";
     if (uiState.tracks.length === 0) {
@@ -392,10 +430,23 @@ export function createAlbumPlayerPanel(
         <span class="album-panel__track-index">${String(track.order).padStart(2, "0")}</span>
         <span class="album-panel__track-title">${escapeHtml(titleText)}</span>
         <span class="album-panel__track-state" aria-hidden="true">${stateIcon}</span>
+        ${
+          collected
+            ? `<button class="album-panel__track-eject" type="button" data-eject="${track.order}" aria-label="Plağı çıkar" title="Plağı çıkar">⏏</button>`
+            : ""
+        }
       `;
       if (collected) {
-        li.addEventListener("click", () => {
+        li.addEventListener("click", (ev) => {
+          /** Eject butonuna tıklandıysa track çalınmasın. */
+          const t = ev.target as HTMLElement | null;
+          if (t && t.closest("[data-eject]")) return;
           void playCanonical(canonicalIndex);
+        });
+        const ejectBtn = li.querySelector<HTMLButtonElement>("[data-eject]");
+        ejectBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          handleEject(track.order);
         });
       }
       frag.appendChild(li);
@@ -987,15 +1038,20 @@ export function createAlbumPlayerPanel(
     applyEffectiveVolume();
   });
 
-  collapseBtn.addEventListener("click", () => {
-    uiState.collapsed = !uiState.collapsed;
+  const collapseBtnEl = collapseBtn;
+  function applyCollapsedUi() {
     shell.classList.toggle("is-collapsed", uiState.collapsed);
-    collapseBtn.textContent = uiState.collapsed ? "+" : "—";
-    collapseBtn.title = uiState.collapsed ? "Büyüt" : "Küçült";
-    collapseBtn.setAttribute(
+    collapseBtnEl.textContent = uiState.collapsed ? "+" : "—";
+    collapseBtnEl.title = uiState.collapsed ? "Büyüt" : "Küçült";
+    collapseBtnEl.setAttribute(
       "aria-label",
       uiState.collapsed ? "Paneli büyüt" : "Paneli küçült",
     );
+  }
+
+  collapseBtn.addEventListener("click", () => {
+    uiState.collapsed = !uiState.collapsed;
+    applyCollapsedUi();
   });
 
   /**
@@ -1098,6 +1154,13 @@ export function createAlbumPlayerPanel(
     restart: restartCurrent,
     activeOrder: () =>
       playbackState.playing ? playbackState.currentCanonical + 1 : 0,
+    toggle() {
+      uiState.collapsed = !uiState.collapsed;
+      applyCollapsedUi();
+    },
+    isOpen() {
+      return !uiState.collapsed;
+    },
     dispose() {
       window.clearInterval(progressTimer);
       player?.destroy();

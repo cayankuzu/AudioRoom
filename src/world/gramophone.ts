@@ -270,7 +270,7 @@ export function createGramophone(
     interactable: {
       kind: "gramophone",
       promptKey: "E",
-      promptText: "E — gramofonu kullan · Y — taşı",
+      promptText: "E — gramofonu taşı · R — başlat/duraklat",
     },
   };
   root.add(interactTarget);

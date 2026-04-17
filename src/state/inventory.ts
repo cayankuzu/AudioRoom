@@ -62,6 +62,18 @@ export interface InventoryState {
    */
   takeActiveToHand(): number;
 
+  /**
+   * Paneldeki bir plağı KOLEKSİYONDAN ÇIKAR (eject).
+   *  - `collected` setinden silinir → panel listesinde artık görünmez.
+   *  - Eğer `activeOrder` bu plaksa, aktif plak sıfırlanır (müzik dışarıdan
+   *    durdurulmalı).
+   *  - Elde taşınan plakla ilişkisi yok.
+   *
+   * Dönen değer: silinen plağın order'ı ve o sırada aktifken aktif miydi.
+   * Plak zaten koleksiyonda yoksa null döner.
+   */
+  eject(order: number): { ejected: number; wasActive: boolean } | null;
+
   /** Gramofon'daki aktif order'ı değiştir (müzik paneli için — collected kontrolü dışı). */
   setActive(order: number): void;
 
@@ -150,6 +162,15 @@ export function createInventory(): InventoryState {
       activeOrder = 0;
       emit();
       return taken;
+    },
+    eject(order) {
+      if (order <= 0) return null;
+      if (!collected.has(order)) return null;
+      const wasActive = activeOrder === order;
+      collected.delete(order);
+      if (wasActive) activeOrder = 0;
+      emit();
+      return { ejected: order, wasActive };
     },
     setActive(order) {
       if (activeOrder === order) return;

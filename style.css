@@ -736,7 +736,7 @@ body {
 
 .album-panel__track {
   display: grid;
-  grid-template-columns: 28px 1fr 16px;
+  grid-template-columns: 28px 1fr 16px 22px;
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.5rem;
@@ -745,6 +745,10 @@ body {
   color: #d6d6d6;
   font-size: 0.78rem;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+.album-panel__track.is-missing {
+  grid-template-columns: 28px 1fr 16px;
 }
 
 .album-panel__track:hover {
@@ -791,6 +795,47 @@ body {
   text-align: right;
   color: #d8d8d8;
   font-size: 0.78rem;
+}
+
+.album-panel__track-eject {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  color: #a8a8a8;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.album-panel__track:hover .album-panel__track-eject,
+.album-panel__track:focus-within .album-panel__track-eject {
+  opacity: 1;
+}
+
+.album-panel__track.is-loaded .album-panel__track-eject,
+.album-panel__track.is-active .album-panel__track-eject {
+  opacity: 0.85;
+}
+
+.album-panel__track-eject:hover {
+  background: rgba(200, 60, 60, 0.15);
+  border-color: rgba(200, 80, 80, 0.5);
+  color: #f4d3d3;
+}
+
+.album-panel__track-eject:active {
+  transform: translateY(1px);
 }
 
 .album-panel__empty {

@@ -16,6 +16,8 @@ export interface Minimap {
     gramPos: THREE.Vector3,
     vinyls: MinimapMarker[],
   ): void;
+  toggle(): void;
+  isOpen(): boolean;
   dispose(): void;
 }
 
@@ -44,9 +46,8 @@ export function createMinimap(parent: HTMLElement): Minimap {
 
   const collapseBtn = shell.querySelector<HTMLButtonElement>(".minimap__collapse");
   let collapsed = false;
-  collapseBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    collapsed = !collapsed;
+
+  function applyCollapsed() {
     shell.classList.toggle("is-collapsed", collapsed);
     if (collapseBtn) {
       collapseBtn.textContent = collapsed ? "+" : "−";
@@ -56,6 +57,12 @@ export function createMinimap(parent: HTMLElement): Minimap {
         collapsed ? "Haritayı büyüt" : "Haritayı küçült",
       );
     }
+  }
+
+  collapseBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    collapsed = !collapsed;
+    applyCollapsed();
   });
 
   const canvas = shell.querySelector<HTMLCanvasElement>(".minimap__canvas");
@@ -195,6 +202,13 @@ export function createMinimap(parent: HTMLElement): Minimap {
       if (now - lastDraw < minFrameMs) return;
       lastDraw = now;
       draw(playerPos, playerYaw, gramPos, vinyls);
+    },
+    toggle() {
+      collapsed = !collapsed;
+      applyCollapsed();
+    },
+    isOpen() {
+      return !collapsed;
     },
     dispose() {
       shell.remove();
