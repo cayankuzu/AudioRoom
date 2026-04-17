@@ -13,8 +13,8 @@ export interface Text3DHandle {
   update(time: number, delta: number): void;
 }
 
-const FONT_REGULAR_URL = "/assets/fonts/gentilis_regular.typeface.json";
-const FONT_BOLD_URL = "/assets/fonts/gentilis_bold.typeface.json";
+const FONT_REGULAR_URL = `${import.meta.env.BASE_URL}assets/fonts/gentilis_regular.typeface.json`;
+const FONT_BOLD_URL = `${import.meta.env.BASE_URL}assets/fonts/gentilis_bold.typeface.json`;
 
 interface TextStyle {
   size: number;
