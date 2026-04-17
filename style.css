@@ -2257,8 +2257,10 @@ body.is-touch {
 
 /* Gerçekten fullscreen'deyken tarayıcı barları zaten gizli — bu state'i
    işaretleyip banner/toolbar hint'lerini ayarlayabiliyoruz. */
+/* Fullscreen'de toolbar da biraz yukarı kayıyor; banner onun altında kalmaya
+ * devam etsin ama küçük bir offset ile. */
 body.is-fullscreen .pc-hint-banner {
-  top: 0.4rem;
+  top: calc(0.35rem + 52px);
 }
 
 body.is-touch #app,
@@ -2473,9 +2475,11 @@ body.is-touch .start-overlay__cta {
    =========================================================== */
 .pc-hint-banner {
   position: fixed;
-  top: max(0.5rem, env(safe-area-inset-top));
+  /** Toolbar üst-merkezde ~44-52px yüksekliğinde; banner daima ONUN
+   * ALTINDA duracak ki çakışma olmasın. Yatay/dikey fark etmez. */
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 54px);
   left: 50%;
-  transform: translate(-50%, -14px);
+  transform: translate(-50%, -10px);
   z-index: 30;
   display: none;
   align-items: center;
@@ -2528,7 +2532,7 @@ body.is-touch .pc-hint-banner {
 /* UI gizliyken banner da gizlensin — hemen sakinleşsin. */
 body.is-ui-hidden .pc-hint-banner {
   opacity: 0 !important;
-  transform: translate(-50%, -14px) !important;
+  transform: translate(-50%, -10px) !important;
 }
 
 /* ===========================================================
