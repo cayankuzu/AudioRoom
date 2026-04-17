@@ -303,6 +303,13 @@ export function createAlbumPlayerPanel(
 
   let player: YTPlayer | null = null;
   let titleHydrationStarted = false;
+  /**
+   * Son açıkça talep edilen parça değişimi (`playCanonical`) zamanı.
+   * YouTube index raporlaması parça geçişlerinde kısa süreli kararsız
+   * olabiliyor — bu pencere içinde (örn. 900ms) canonical guard sessiz
+   * kalır, böylece auto-advance hedefi doğru yüklendikten sonra karar verir.
+   */
+  let lastPlayRequestAt = 0;
 
   function updatePlayingUi(value: boolean): void {
     playbackState.playing = value;
@@ -611,6 +618,7 @@ export function createAlbumPlayerPanel(
       ytIdx: track.ytIndex,
       videoId: track.videoId,
     });
+    lastPlayRequestAt = performance.now();
     safeCall(() => player!.playVideoAt(track.ytIndex), undefined);
     playbackState.currentCanonical = canonicalIndex;
     highlightActive();
@@ -699,14 +707,17 @@ export function createAlbumPlayerPanel(
           captureYtIdsFromPlayer();
 
           /**
-           * KRİTİK GUARD — Her çalma/buffer durumu değişiminde:
-           * YouTube'un o an yüklü olduğu video REALLY canonical listeye
-           * dahil mi VE oyuncunun plağı var mı? Değilse anında durdur.
+           * KRİTİK GUARD + AUTO-ADVANCE — Her çalma/buffer durumu değişiminde:
            *
-           * Bu; YT playlist'in albüm dışı (remix, röportaj, fazlalık)
-           * videolara otomatik geçmesini, parça sonrası beklenmeyen
-           * auto-advance'i ve canonical mapping'de yeri olmayan bir
-           * index'i sessizce engeller.
+           * YouTube'un yüklü olduğu video canonical listeye dahil mi VE
+           * oyuncunun plağı var mı?
+           *
+           *  - Değilse: PAUSE DEĞİL, sıradaki TOPLANMIŞ canonical parçaya atla.
+           *    Böylece bir parça bittiğinde YT kendiliğinden albüm dışı bir
+           *    videoya atlasa veya plağı olmayan bir parçaya geçse bile
+           *    sistem otomatik olarak oyuncunun sıradaki plağını çalar.
+           *
+           *  - Hiç toplanmış sıradaki parça kalmadıysa: tamamen dur.
            */
           if (state === 1 || state === 3) {
             const liveYt = safeCall(() => player!.getPlaylistIndex(), -1);
@@ -714,13 +725,26 @@ export function createAlbumPlayerPanel(
               liveYt >= 0 ? uiState.tracks.findIndex((t) => t.ytIndex === liveYt) : -1;
             const canonicalOrder = canonical >= 0 ? uiState.tracks[canonical].order : -1;
             const hasRecord = canonicalOrder > 0 && inventory.has(canonicalOrder);
+            const transitioning = performance.now() - lastPlayRequestAt < 900;
 
             if (canonical < 0 || !hasRecord) {
-              console.log(
-                LOG,
-                "Engellendi — yüklü video canonical listede yok veya plak yok.",
-                { liveYt, canonical, canonicalOrder },
-              );
+              if (transitioning) {
+                /** YT henüz talep ettiğimiz parçayı yüklememiş olabilir — karar verme, sadece pause olmasın. */
+                return;
+              }
+              const startFrom = canonical >= 0 ? canonical : playbackState.currentCanonical;
+              const nxt = findNextCollected(startFrom, 1);
+              if (nxt >= 0 && nxt !== startFrom) {
+                console.log(LOG, "Geçersiz/plağı olmayan parça — sıradaki toplanmışa atla.", {
+                  liveYt,
+                  canonical,
+                  canonicalOrder,
+                  nxt,
+                });
+                void playCanonical(nxt);
+                return;
+              }
+              console.log(LOG, "Geçersiz parça + sıradaki plak yok — dur.");
               safeCall(() => player!.pauseVideo(), undefined);
               safeCall(() => player!.mute(), undefined);
               updateMuteUi(true);
