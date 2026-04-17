@@ -264,6 +264,19 @@ export function startExperience(container: HTMLElement): void {
     onGramophoneY() {
       gramophone.toggleCarry(camera, terrain.getHeightAt);
     },
+    onDropCarried() {
+      /**
+       * G — elde tutulan plağı oyuncunun ayağına bırak.
+       * Envanterden carry düşer, dünya mesh'i geri görünür.
+       */
+      const order = inventory.carriedOrder;
+      if (order <= 0) return;
+      const dropSpot = computeDropSpotNearPlayer();
+      inventory.dropCarry();
+      vinylSystem.dropAt(order, dropSpot);
+      const title = vinylSystem.getSpawn(order)?.title ?? "";
+      console.log("[Plak]", `Bırakıldı (G) → order=${order} "${title}"`);
+    },
   });
 
   /** Parlaklık değişimini doğrudan renderer exposure'a uygula. */
@@ -410,10 +423,10 @@ export function startExperience(container: HTMLElement): void {
     } else if (inventory.carriedOrder > 0) {
       /**
        * Herhangi bir hedefe bakmıyoruz ama elde plak var — oyuncuya ne
-       * yapabileceğini sessizce hatırlat.
+       * yapabileceğini sessizce hatırlat. Bırakmak için G.
        */
       const title = vinylSystem.getSpawn(inventory.carriedOrder)?.title ?? "";
-      interactionHint.show("i", `Elinde "${title}" plağı · gramofona yaklaş`);
+      interactionHint.show("G", `Elinde "${title}" · G ile bırak, gramofona yaklaş`);
     } else {
       interactionHint.hide();
     }

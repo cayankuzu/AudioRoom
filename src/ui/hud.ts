@@ -18,7 +18,8 @@ export function createHud(parent: HTMLElement): Hud {
       <div class="hud__row"><span>Fare</span><em>Bakış</em></div>
       <div class="hud__row"><span>F</span><em>Fener</em></div>
       <div class="hud__divider"></div>
-      <div class="hud__row"><span>E</span><em>Etkileşim / Gramofon</em></div>
+      <div class="hud__row"><span>E</span><em>Plağı al / Gramofon</em></div>
+      <div class="hud__row"><span>G</span><em>Eldeki plağı bırak</em></div>
       <div class="hud__row"><span>Y</span><em>Gramofonu taşı / bırak</em></div>
       <div class="hud__divider"></div>
       <div class="hud__row hud__row--hint"><span>ESC</span><em>İmleci serbest bırak</em></div>

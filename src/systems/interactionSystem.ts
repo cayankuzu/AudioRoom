@@ -18,6 +18,11 @@ export interface InteractionCallbacks {
   onCollectVinyl(order: number): void;
   onGramophoneE(): void;
   onGramophoneY(): void;
+  /**
+   * G tuşu — elde tutulan plağı bırakma. Hedefe bakmak gerekmez; oyuncu
+   * taşıdığı plağı dünyaya (önünde-ayağında) düşürmek ister.
+   */
+  onDropCarried(): void;
 }
 
 export interface InteractionSystem {
@@ -68,6 +73,12 @@ export function createInteractionSystem(
        * durumunda kilitleniriz.
        */
       callbacks.onGramophoneY();
+    } else if (e.code === "KeyG") {
+      /**
+       * G — elde tutulan plağı bırak. Hedefe bakma zorunluluğu yok;
+       * her yerde çalışır. Elde plak yoksa callback sessizce no-op yapar.
+       */
+      callbacks.onDropCarried();
     }
   };
   document.addEventListener("keydown", onKeyDown);
