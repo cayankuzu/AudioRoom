@@ -35,6 +35,377 @@ body {
   height: 100vh;
 }
 
+/* --- Kütüphane (canlı arayüz, reklam yok) --- */
+.entry-hub {
+  --eh-cyan: #22d3ee;
+  --eh-violet: #a78bfa;
+  --eh-magenta: #f472b6;
+  --eh-lime: #bef264;
+  --eh-surface: rgba(18, 8, 26, 0.55);
+
+  position: relative;
+  z-index: 200;
+  isolation: isolate;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  color: #f1e8ff;
+  font-family: Outfit, "Source Sans 3", system-ui, sans-serif;
+  background: #0a0412;
+}
+
+.entry-hub__aura {
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(
+    from 210deg at 50% 50%,
+    rgba(34, 211, 238, 0.15),
+    rgba(167, 139, 250, 0.2),
+    rgba(244, 114, 182, 0.14),
+    rgba(190, 242, 100, 0.1),
+    rgba(34, 211, 238, 0.15)
+  );
+  animation: entry-hub-spin 28s linear infinite;
+  filter: blur(80px);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+@keyframes entry-hub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.entry-hub__blobs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.entry-hub__blobs span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  animation: entry-hub-float 14s ease-in-out infinite;
+}
+
+.entry-hub__blobs span:nth-child(1) {
+  width: min(55vw, 420px);
+  height: min(55vw, 420px);
+  left: -8%;
+  top: 8%;
+  background: rgba(34, 211, 238, 0.35);
+  animation-delay: 0s;
+}
+
+.entry-hub__blobs span:nth-child(2) {
+  width: min(48vw, 380px);
+  height: min(48vw, 380px);
+  right: -5%;
+  top: 35%;
+  background: rgba(244, 114, 182, 0.28);
+  animation-delay: -4s;
+}
+
+.entry-hub__blobs span:nth-child(3) {
+  width: min(60vw, 480px);
+  height: min(60vw, 480px);
+  left: 25%;
+  bottom: -20%;
+  background: rgba(167, 139, 250, 0.25);
+  animation-delay: -7s;
+}
+
+@keyframes entry-hub-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(2%, -3%) scale(1.06);
+  }
+}
+
+.entry-hub__main {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow: auto;
+  padding: clamp(1.25rem, 4vh, 2.5rem) clamp(1rem, 4vw, 2.5rem) clamp(1.5rem, 5vh, 3rem);
+}
+
+.entry-hub__library {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.entry-hub__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem 1.75rem;
+  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+.entry-hub__logo-wrap {
+  position: relative;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+}
+
+.entry-hub__logo {
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--eh-cyan), var(--eh-violet) 55%, var(--eh-magenta));
+  box-shadow: 0 0 40px rgba(167, 139, 250, 0.45);
+}
+
+.entry-hub__logo-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 1.2rem;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  animation: entry-hub-pulse 3s ease-in-out infinite;
+}
+
+@keyframes entry-hub-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.entry-hub__header-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.entry-hub__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--eh-cyan), var(--eh-lime));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.entry-hub__title {
+  margin: 0;
+  font-size: clamp(1.65rem, 4.5vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  color: #fff;
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.35);
+}
+
+.entry-hub__subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: rgba(226, 213, 255, 0.72);
+  max-width: 36ch;
+  line-height: 1.5;
+}
+
+.entry-hub__shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.entry-hub__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 380px);
+  min-height: 0;
+  text-align: left;
+  padding: 0;
+  border: none;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  user-select: none;
+  background: var(--eh-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 24px 60px rgba(0, 0, 0, 0.45);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
+}
+
+.entry-hub__card-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.35), rgba(244, 114, 182, 0.3));
+  filter: blur(16px);
+  z-index: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .entry-hub__card:hover,
+  .entry-hub__card:focus-visible {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+      0 32px 80px rgba(0, 0, 0, 0.55),
+      0 0 60px rgba(167, 139, 250, 0.2);
+  }
+
+  .entry-hub__card:hover .entry-hub__card-glow,
+  .entry-hub__card:focus-visible .entry-hub__card-glow {
+    opacity: 0.55;
+  }
+
+  .entry-hub__card:hover .entry-hub__cover-img {
+    transform: scale(1.06);
+  }
+
+  .entry-hub__card:hover .entry-hub__cover-shine {
+    transform: translateX(100%);
+  }
+
+  .entry-hub__card:hover .entry-hub__card-cta {
+    filter: brightness(1.08);
+  }
+}
+
+.entry-hub__card:focus-visible {
+  outline: 2px solid var(--eh-cyan);
+  outline-offset: 4px;
+}
+
+.entry-hub__cover-wrap {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  background: #12081a;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.entry-hub__cover-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.entry-hub__cover-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.12) 48%,
+    transparent 62%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+
+.entry-hub__card-body {
+  position: relative;
+  z-index: 1;
+  padding: 1.1rem 1.2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1;
+}
+
+.entry-hub__card-artist {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--eh-cyan);
+}
+
+.entry-hub__card-title {
+  margin: 0.4rem 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.entry-hub__card-tagline {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  color: rgba(226, 213, 255, 0.65);
+  line-height: 1.4;
+}
+
+.entry-hub__card-desc {
+  margin: 0 0 1rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: rgba(200, 190, 220, 0.75);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.entry-hub__card-cta {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0a0412;
+  background: linear-gradient(90deg, var(--eh-lime), var(--eh-cyan));
+  padding: 0.5rem 1rem 0.5rem 0.65rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 20px rgba(190, 242, 100, 0.25);
+}
+
+.entry-hub__card-cta-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0a0412;
+  opacity: 0.35;
+}
+
 .landing {
   min-height: 100vh;
   display: grid;
@@ -289,7 +660,7 @@ body {
   padding: 0.55rem 0.85rem 0.7rem;
   border-radius: 12px;
   font-size: 0.78rem;
-  min-width: 210px;
+  min-width: 230px;
   z-index: 2;
   backdrop-filter: blur(4px);
   transition: padding 0.2s ease, min-width 0.2s ease;
@@ -297,10 +668,15 @@ body {
 
 .hud__head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.45rem;
   margin-bottom: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.hud__head-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .hud__kicker {
@@ -309,6 +685,41 @@ body {
   font-size: 0.68rem;
   text-transform: uppercase;
   color: #a0a0a0;
+}
+
+.hud__library-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.3rem;
+  margin: 0;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #e8e8e8;
+  cursor: pointer;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  background: rgba(28, 28, 30, 0.95);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hud__library-btn:hover {
+  border-color: #6a9aa8;
+  background: rgba(36, 42, 48, 0.98);
+}
+
+.hud__library-icon {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1;
+  color: #7dd3fc;
+}
+
+.hud__library-text {
+  white-space: nowrap;
 }
 
 .hud__collapse {
@@ -1506,3 +1917,502 @@ body {
     bottom: 0.4rem;
   }
 }
+
+/* =================================================================
+   MOBİL · DOKUNMATİK KONTROL KATMANI
+   - D-pad (yön okları), aksiyon butonları (AL / BIRAK / PLAY / ZIPLA),
+     toolbar (fener · harita · panel · kontroller · parlaklık · duraklat).
+   - body.is-touch olduğunda panel layout'u kompakt moda döner.
+   - Telefon YATAY mod için optimize edilmiştir.
+   ================================================================= */
+
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  /** iOS Safari "notch" safe area'ya saygı */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /** Oyuncunun parmak izlerini bırakması istenmeyen iOS long-press callout'unu kapat. */
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: opacity 0.2s ease;
+}
+
+.mobile-controls.is-hidden {
+  opacity: 0;
+  pointer-events: none !important;
+}
+
+/* Tek tek butonlar etkileşime girsin. */
+.mobile-controls__pad,
+.mobile-controls__action,
+.mobile-controls__tool {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* ------- D-PAD (sol alt) ------- */
+.mobile-controls__dpad {
+  position: absolute;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: 168px;
+  height: 168px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.mobile-controls__pad {
+  display: grid;
+  place-content: center;
+  background: rgba(14, 14, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(245, 245, 250, 0.88);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  padding: 0;
+  font: inherit;
+}
+
+.mobile-controls__pad svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.mobile-controls__pad.is-pressed {
+  transform: scale(0.94);
+  background: rgba(244, 214, 117, 0.22);
+  border-color: rgba(244, 214, 117, 0.55);
+  color: #fff;
+}
+
+.mobile-controls__pad--up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.mobile-controls__pad--left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.mobile-controls__pad--right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.mobile-controls__pad--down {
+  grid-column: 2;
+  grid-row: 3;
+}
+.mobile-controls__pad--run {
+  grid-column: 1 / span 1;
+  grid-row: 3;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: rgba(240, 240, 250, 0.85);
+  background: rgba(14, 14, 18, 0.55);
+}
+
+/* ------- Aksiyon butonları (sağ alt) ------- */
+.mobile-controls__actions {
+  position: absolute;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  grid-template-rows: repeat(2, 76px);
+  gap: 10px;
+  /** Ana aksiyon sağ altta; yardımcılar çapraz. */
+}
+
+.mobile-controls__action {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 50%;
+  background: rgba(18, 18, 22, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(245, 245, 250, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.mobile-controls__action.is-pressed {
+  transform: scale(0.93);
+  background: rgba(244, 214, 117, 0.22);
+  border-color: rgba(244, 214, 117, 0.65);
+  color: #fff;
+}
+
+.mobile-controls__action-glyph {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.mobile-controls__action-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.22em;
+  font-weight: 600;
+  color: rgba(220, 220, 230, 0.7);
+  text-transform: uppercase;
+}
+
+.mobile-controls__action--primary {
+  grid-column: 2;
+  grid-row: 2;
+  background: rgba(220, 180, 90, 0.28);
+  border-color: rgba(244, 214, 117, 0.65);
+}
+
+.mobile-controls__action--primary .mobile-controls__action-glyph {
+  color: #fff8dc;
+}
+
+/* Q — sola */
+.mobile-controls__action:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+/* R — sağ üst */
+.mobile-controls__action--secondary {
+  grid-column: 2;
+  grid-row: 1;
+  background: rgba(60, 100, 150, 0.26);
+  border-color: rgba(120, 170, 220, 0.48);
+}
+
+/* Zıpla — sol üst */
+.mobile-controls__action--jump {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* ------- Toolbar (sağ üst) ------- */
+.mobile-controls__toolbar {
+  position: absolute;
+  right: max(0.6rem, env(safe-area-inset-right));
+  top: max(0.6rem, env(safe-area-inset-top));
+  display: flex;
+  gap: 6px;
+  background: rgba(12, 12, 16, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mobile-controls__tool {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(235, 235, 245, 0.85);
+  cursor: pointer;
+  padding: 0;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
+    transform 120ms ease;
+}
+
+.mobile-controls__tool svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-controls__tool.is-pressed,
+.mobile-controls__tool:active {
+  background: rgba(244, 214, 117, 0.2);
+  border-color: rgba(244, 214, 117, 0.5);
+  color: #fff;
+  transform: scale(0.92);
+}
+
+.mobile-controls__tool--pause {
+  margin-left: 2px;
+  background: rgba(200, 60, 60, 0.12);
+  border-color: rgba(200, 60, 60, 0.28);
+}
+
+/* ------- Touch-odaklı layout düzenlemeleri ------- */
+/**
+ * body.is-touch (createMobileControls mount'unda eklenir) — panelleri mobil
+ * ekranlara göre küçült, yatay telefonda parmağa güvenle erişilebilir
+ * pozisyonlara kaydır. Desktop'ta bu kurallar etkilenmeksizin eskisi gibi
+ * çalışır.
+ */
+body.is-touch {
+  /* iOS 15+ address-bar değişimleriyle uyumlu tam ekran yükseklik. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  /** Pinch-zoom / double-tap zoom'u devre dışı bırak. */
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+body.is-touch #app,
+body.is-touch #experience {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Mobil: HUD panelini (Kontroller kartı) varsayılan kapalı başlat — butonla açılır. */
+body.is-touch .hud {
+  top: 0.5rem;
+  left: 0.5rem;
+  min-width: 130px;
+  font-size: 0.68rem;
+  padding: 0.4rem 0.55rem 0.45rem;
+}
+
+/* Minimap — toolbar ile çakışmaması için sol-alt tarafta, d-pad'in üstünde kal */
+body.is-touch .minimap {
+  left: 0.4rem;
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 178px);
+  width: 140px;
+  padding: 0.35rem 0.4rem 0.4rem;
+  z-index: 20;
+  background: rgba(10, 10, 12, 0.68);
+}
+
+body.is-touch .minimap.is-collapsed {
+  width: auto;
+  min-width: 94px;
+  padding: 0.32rem 0.5rem 0.36rem;
+}
+
+body.is-touch .minimap__head {
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  padding: 0 0.2rem 0.25rem;
+}
+
+/* Album paneli — sağ-alt çakışır, onu action butonlarının ÜSTÜNE çıkar */
+body.is-touch .album-panel {
+  right: 0.5rem;
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 172px);
+  width: min(340px, 55vw);
+  min-width: 210px;
+}
+
+/* Parlaklık paneli — toolbar ile çakışmaması için toolbar'ın altında */
+body.is-touch .bright-panel {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px);
+  right: 0.5rem;
+  min-width: 180px;
+  padding: 0.4rem 0.55rem;
+}
+
+body.is-touch .capture-panel {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px + 140px);
+  right: 0.5rem;
+  min-width: 180px;
+}
+
+body.is-touch .bright-panel--collapsed ~ .capture-panel {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px + 42px);
+}
+
+/* Experience back nav — mobilde hud ile çakışır, sağ üst yerine gizleme.
+   Gizlemek yerine biraz kaydır. */
+body.is-touch .experience-back-nav {
+  top: 0.45rem;
+  left: 0.45rem;
+  z-index: 45;
+}
+
+body.is-touch .experience-back-nav__btn {
+  padding: 0.3rem 0.7rem 0.3rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+/* HUD, minimap, album panel mobilde biraz daha şeffaf */
+body.is-touch .hud,
+body.is-touch .minimap,
+body.is-touch .album-panel,
+body.is-touch .bright-panel {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+/* Interaction hint — mobilde D-pad/action arasında ortalan, biraz yukarı taşı */
+body.is-touch .interaction-hint {
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 188px);
+  font-size: 0.72rem;
+  padding: 0.4rem 0.7rem 0.38rem;
+}
+
+/* Brand footer — mobilde d-pad ile çakışabilir; hafifçe göze almak için ortada tut ama küçült.
+   D-pad 168px, action 162px; alt orta gezilebilir. */
+body.is-touch .brand-footer {
+  bottom: 0.25rem;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  padding: 0.14rem 0.5rem;
+  opacity: 0.6;
+}
+
+/* Start overlay — mobilde kart kompakt */
+body.is-touch .start-overlay__card {
+  padding: 1.4rem 1.3rem 1.2rem;
+  max-width: min(420px, 88vw);
+  border-radius: 16px;
+}
+
+body.is-touch .start-overlay h2 {
+  font-size: 1.4rem;
+}
+
+body.is-touch .start-overlay__desc {
+  font-size: 0.82rem;
+}
+
+body.is-touch .start-overlay__controls {
+  gap: 0.3rem 0.5rem;
+}
+
+body.is-touch .start-overlay__ctrl {
+  padding: 0.36rem 0.55rem;
+  font-size: 0.7rem;
+}
+
+body.is-touch .start-overlay__cta {
+  padding: 0.85rem 1.6rem;
+  font-size: 0.9rem;
+}
+
+/* Mobil · TELEFON YATAY (kısa yükseklik, geniş ekran) — d-pad/toolbar
+   boyutlarını biraz küçülterek merkeze oyun alanı bırak. */
+@media (max-width: 1000px) and (max-height: 520px) and (orientation: landscape) {
+  body.is-touch .mobile-controls__dpad {
+    width: 148px;
+    height: 148px;
+    left: 0.6rem;
+    bottom: 0.6rem;
+    gap: 5px;
+  }
+
+  body.is-touch .mobile-controls__actions {
+    grid-template-columns: repeat(2, 66px);
+    grid-template-rows: repeat(2, 66px);
+    right: 0.6rem;
+    bottom: 0.6rem;
+    gap: 8px;
+  }
+
+  body.is-touch .mobile-controls__action-glyph {
+    font-size: 1rem;
+  }
+
+  body.is-touch .mobile-controls__action-label {
+    font-size: 0.48rem;
+    letter-spacing: 0.18em;
+  }
+
+  body.is-touch .mobile-controls__pad svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  body.is-touch .mobile-controls__toolbar {
+    top: 0.35rem;
+    right: 0.35rem;
+  }
+
+  body.is-touch .mobile-controls__tool {
+    width: 34px;
+    height: 34px;
+  }
+
+  body.is-touch .mobile-controls__tool svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  body.is-touch .hud {
+    font-size: 0.6rem;
+    min-width: 118px;
+    padding: 0.32rem 0.5rem 0.4rem;
+  }
+
+  body.is-touch .minimap {
+    width: 124px;
+    bottom: calc(0.6rem + 156px);
+  }
+
+  body.is-touch .album-panel {
+    width: min(280px, 42vw);
+    min-width: 190px;
+    bottom: calc(0.6rem + 150px);
+  }
+
+  body.is-touch .interaction-hint {
+    bottom: calc(0.6rem + 166px);
+    font-size: 0.66rem;
+  }
+
+  body.is-touch .brand-footer {
+    display: none;
+  }
+
+  body.is-touch .bright-panel,
+  body.is-touch .capture-panel {
+    min-width: 148px;
+  }
+
+  body.is-touch .bright-panel {
+    top: calc(0.35rem + 44px);
+  }
+
+  body.is-touch .capture-panel {
+    top: calc(0.35rem + 44px + 126px);
+  }
+
+  body.is-touch .bright-panel--collapsed ~ .capture-panel {
+    top: calc(0.35rem + 44px + 40px);
+  }
+}
+
+/* TELEFON DİK (portrait) — yatayda daha rahat olacağı için uyar. */
+@media (orientation: portrait) and (max-width: 760px) {
+  body.is-touch .mobile-controls__dpad {
+    width: 156px;
+    height: 156px;
+  }
+
+  body.is-touch .album-panel {
+    width: min(92vw, 360px);
+    bottom: calc(0.6rem + 184px);
+  }
+
+  body.is-touch .minimap {
+    width: 128px;
+    bottom: calc(0.6rem + 184px);
+  }
+}
+

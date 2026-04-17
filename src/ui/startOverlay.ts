@@ -21,6 +21,41 @@ export interface StartOverlay {
 export function createStartOverlay(parent: HTMLElement): StartOverlay {
   const el = document.createElement("div");
   el.className = "start-overlay is-first";
+  /**
+   * Dokunmatik cihaz tespiti: hem hover yok hem coarse pointer varsa
+   * mobil/tablet kabul edilir. Bu bilgiye göre giriş kartındaki "tıklayın"
+   * metnini "dokunun" yapıyoruz ve kontrol listesini telefona uygun bir
+   * sete (yön okları, AL/BIRAK/PLAY) değiştiriyoruz.
+   */
+  const isTouch =
+    typeof window !== "undefined" &&
+    ((typeof window.matchMedia === "function" &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches) ||
+      "ontouchstart" in window ||
+      (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0));
+
+  const startWord = isTouch ? "dokunun" : "tıklayın";
+  const controlsHtml = isTouch
+    ? `
+        <div class="start-overlay__ctrl"><span>↑↓←→</span><em>Yürü</em></div>
+        <div class="start-overlay__ctrl"><span>Sürükle</span><em>Bak</em></div>
+        <div class="start-overlay__ctrl"><span>AL</span><em>Plak / Gramofon</em></div>
+        <div class="start-overlay__ctrl"><span>BIRAK</span><em>Elindekini at</em></div>
+        <div class="start-overlay__ctrl"><span>PLAY</span><em>Çal / Durdur</em></div>
+        <div class="start-overlay__ctrl"><span>KOŞ</span><em>Hızlı yürü</em></div>
+      `
+    : `
+        <div class="start-overlay__ctrl"><span>WASD</span><em>Yürü</em></div>
+        <div class="start-overlay__ctrl"><span>Fare</span><em>Bak</em></div>
+        <div class="start-overlay__ctrl"><span>E</span><em>Etkileşim</em></div>
+        <div class="start-overlay__ctrl"><span>F</span><em>Fener</em></div>
+        <div class="start-overlay__ctrl"><span>Y</span><em>Gramofonu Taşı</em></div>
+        <div class="start-overlay__ctrl"><span>Shift</span><em>Koş</em></div>
+      `;
+  const noteHtml = isTouch
+    ? `<p class="start-overlay__note">Telefonu yatay çevirerek kullanmanız tavsiye edilir.</p>`
+    : `<p class="start-overlay__note">Gramofona plak takılmadan müzik başlamaz.</p>`;
+
   el.innerHTML = `
     <div class="start-overlay__card start-overlay__card--intro" data-card="intro">
       <p class="start-overlay__kicker">REDD · MÜKEMMEL BOŞLUK</p>
@@ -31,19 +66,14 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
         Tüm plakları toplayarak albümü tamamlayabilirsiniz.
       </p>
       <div class="start-overlay__controls" role="group" aria-label="Kontroller">
-        <div class="start-overlay__ctrl"><span>WASD</span><em>Yürü</em></div>
-        <div class="start-overlay__ctrl"><span>Fare</span><em>Bak</em></div>
-        <div class="start-overlay__ctrl"><span>E</span><em>Etkileşim</em></div>
-        <div class="start-overlay__ctrl"><span>F</span><em>Fener</em></div>
-        <div class="start-overlay__ctrl"><span>Y</span><em>Gramofonu Taşı</em></div>
-        <div class="start-overlay__ctrl"><span>Shift</span><em>Koş</em></div>
+        ${controlsHtml}
       </div>
-      <button type="button" class="start-overlay__cta" data-start>Başlamak için tıklayın</button>
-      <p class="start-overlay__note">Gramofona plak takılmadan müzik başlamaz.</p>
+      <button type="button" class="start-overlay__cta" data-start>Başlamak için ${startWord}</button>
+      ${noteHtml}
     </div>
     <div class="start-overlay__card start-overlay__card--pause" data-card="pause">
       <p class="start-overlay__kicker">Duraklatıldı</p>
-      <h2>Devam etmek için tıklayın</h2>
+      <h2>Devam etmek için ${startWord}</h2>
       <p class="start-overlay__desc">
         Deneyime kaldığınız yerden geri dönebilirsiniz.
       </p>

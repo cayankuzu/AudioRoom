@@ -1,3 +1,8 @@
+export interface HudOptions {
+  /** Sol üst kontrol panelinde "Kütüphane" dönüş butonunu göster. */
+  showLibraryBack?: boolean;
+}
+
 export interface Hud {
   /** Paneli aç/kapa (klavye kısayolu ile tetikleme için). */
   toggle(): void;
@@ -6,12 +11,21 @@ export interface Hud {
   dispose(): void;
 }
 
-export function createHud(parent: HTMLElement): Hud {
+export function createHud(parent: HTMLElement, options: HudOptions = {}): Hud {
   const hud = document.createElement("div");
   hud.className = "hud";
+  const libraryBtn = options.showLibraryBack
+    ? `<button type="button" class="hud__library-btn" aria-label="Kütüphaneye dön" title="Kütüphaneye dön">
+          <span class="hud__library-icon" aria-hidden="true">‹</span>
+          <span class="hud__library-text">Kütüphane</span>
+        </button>`
+    : "";
   hud.innerHTML = `
     <header class="hud__head">
-      <p class="hud__kicker">Kontroller</p>
+      ${libraryBtn}
+      <div class="hud__head-text">
+        <p class="hud__kicker">Kontroller</p>
+      </div>
       <button class="hud__collapse" type="button" aria-label="Paneli küçült" title="Küçült">−</button>
     </header>
     <div class="hud__body">
@@ -36,6 +50,14 @@ export function createHud(parent: HTMLElement): Hud {
     </div>
   `;
   parent.appendChild(hud);
+
+  const libBtn = hud.querySelector<HTMLButtonElement>(".hud__library-btn");
+  const onLibraryClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    document.exitPointerLock();
+    window.location.reload();
+  };
+  libBtn?.addEventListener("click", onLibraryClick);
 
   const collapseBtn = hud.querySelector<HTMLButtonElement>(".hud__collapse");
   let collapsed = false;
@@ -67,6 +89,7 @@ export function createHud(parent: HTMLElement): Hud {
       return !collapsed;
     },
     dispose() {
+      libBtn?.removeEventListener("click", onLibraryClick);
       hud.remove();
     },
   };

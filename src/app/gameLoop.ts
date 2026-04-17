@@ -44,6 +44,7 @@ import { createCaptureControls } from "../ui/captureControls";
 import { createBrandFooter } from "../ui/brandFooter";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
+import { createMobileControls } from "../ui/mobileControls";
 
 export function startExperience(container: HTMLElement): void {
   /** --- Oturum bazlı seed: her yüklemede dünya farklı ama mantıklı dizilir. --- */
@@ -169,7 +170,7 @@ export function startExperience(container: HTMLElement): void {
   const flashlight = createFlashlightSystem(camera);
   const audioDistance = createAudioDistanceSystem();
 
-  const hud = createHud(container);
+  const hud = createHud(container, { showLibraryBack: true });
   const startOverlay = createStartOverlay(container);
   const albumPanel = createAlbumPlayerPanel(container, inventory, {
     /**
@@ -225,6 +226,38 @@ export function startExperience(container: HTMLElement): void {
    * DOM — sahneye hiçbir maliyeti yok, pointer-events: none.
    */
   createBrandFooter(container);
+
+  /**
+   * --- Mobil dokunmatik kontrol katmanı ---
+   * Yalnızca dokunmatik cihazlarda mount edilir. D-pad (yön okları), aksiyon
+   * butonları (E/Q/R/Space) ve ekranın serbest bölgesinde parmak sürükleme
+   * ile kamera bakışı sağlar. Masaüstünde hiç eklenmez — klavye/fare akışı
+   * etkilenmez.
+   *
+   * Telefon yatay modunda layout ideal olacak şekilde CSS'te optimize
+   * edildi: sol-alt d-pad, sağ-alt aksiyon butonları, sağ-üst minyatür
+   * toolbar (fener, harita, albüm, kontroller, parlaklık, duraklat).
+   */
+  const mobileControls = input.isTouch
+    ? createMobileControls(container, input, {
+        lookTarget: renderer.domElement,
+        onToggleFlashlight: () => flashlight.toggle(),
+        onToggleMap: () => minimap.toggle(),
+        onTogglePanel: () => albumPanel.toggle(),
+        onToggleHud: () => hud.toggle(),
+        onToggleBrightness: () => brightness.toggle(),
+        onPause: () => input.releaseLock(),
+      })
+    : null;
+  /**
+   * Mobil iken `<body>`a bir sınıf ekle → CSS, panelleri (HUD, minimap,
+   * album panel, bright-panel, capture-panel) yatay telefonda sığacak
+   * şekilde kompakt moduna alır.
+   */
+  if (input.isTouch) {
+    document.body.classList.add("is-touch");
+    mobileControls?.setVisible(false);
+  }
 
   /**
    * Plağın "yere düşme" konumunu oyuncunun önünde-ayağında hesaplar.
@@ -424,8 +457,17 @@ export function startExperience(container: HTMLElement): void {
     ambient.start();
   });
   input.onLockChange((locked) => {
-    if (locked) startOverlay.hide();
-    else startOverlay.show();
+    if (locked) {
+      startOverlay.hide();
+      mobileControls?.setVisible(true);
+    } else {
+      startOverlay.show();
+      /**
+       * Mobilde duraklayınca kontrolleri gizle — pause kartını tıklaması
+       * yanlışlıkla D-pad'e değmesin.
+       */
+      mobileControls?.setVisible(false);
+    }
   });
 
   renderer.domElement.addEventListener("click", () => {
