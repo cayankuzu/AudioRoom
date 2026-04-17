@@ -1,9 +1,0 @@
-feat: klasik pickup/drop plak mekanigi + elde tasima gorseli
-
-- Oyuncu en fazla 1 plak tasir; baska plak alirken eldeki ayagin yanina duser.
-- Plak gramofona yerlestirilene kadar panel listesinde ve YouTube oynatiminda gorunmez (collected sadece yerlestirmede artar).
-- Gramofona yerlestirme atomik swap: eski plak varsa ELE geri gecer (tek inventory emit, UI flicker yok).
-- Yeni carrySystem (src/world/carrySystem.ts): kameraya bagli handSlot, halo/interactable kapali, hafif bob + sway.
-- vinylSystem.collect -> pickUp (sadece gorsel gizleme); respawn -> dropAt.
-- Dinamik prompt: el doluysa "elindekini birak, ... plagini al"; gramofonda "plaklari degistir".
-- Envanter API: pickUp, dropCarry, placeCarriedOnGramophone, takeActiveToHand, isCarrying.
