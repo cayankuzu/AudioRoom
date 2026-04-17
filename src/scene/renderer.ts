@@ -10,6 +10,12 @@ export function createRenderer(container: HTMLElement): THREE.WebGLRenderer {
     antialias: true,
     powerPreference: "high-performance",
     stencil: false,
+    /**
+     * Ekran görüntüsü özelliği için şart — aksi halde bir sonraki frame'den
+     * önce canvas buffer'ı temizlenebilir ve `toDataURL()` boş/siyah bir
+     * görüntü döner. Modern GPU'larda performans etkisi ihmal edilebilir.
+     */
+    preserveDrawingBuffer: true,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.85));
   renderer.setSize(window.innerWidth, window.innerHeight);

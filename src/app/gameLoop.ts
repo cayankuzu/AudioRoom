@@ -39,6 +39,7 @@ import { createStartOverlay } from "../ui/startOverlay";
 import { createHud } from "../ui/hud";
 import { createAlbumPlayerPanel } from "../ui/albumPlayerPanel";
 import { createBrightnessControl } from "../ui/brightnessControl";
+import { createCaptureControls } from "../ui/captureControls";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 
@@ -161,6 +162,22 @@ export function startExperience(container: HTMLElement): void {
   const startOverlay = createStartOverlay(container);
   const albumPanel = createAlbumPlayerPanel(container, inventory);
   const brightness = createBrightnessControl(container);
+  /**
+   * Parlaklık panelinin ALTINDA konumlanır (CSS'te `.capture-panel` ile).
+   * Ekran görüntüsü almak için önce aktif frame'i taze render ederiz; bu
+   * `preserveDrawingBuffer: true` ile birleşince toDataURL'nin kararlı
+   * bir PNG döndürmesini garantiler.
+   */
+  createCaptureControls(container, {
+    captureScreenshot: () => {
+      renderer.render(scene, camera);
+      return renderer.domElement.toDataURL("image/png");
+    },
+    shareUrl: window.location.href,
+    shareTitle: "Redd — Mükemmel Boşluk",
+    shareText:
+      "Sessiz bir kraterde plakları topla, gramofona tak ve Redd'in Mükemmel Boşluk albümünü adımla.",
+  });
   const interactionHint = createInteractionHint(container);
   const minimap = createMinimap(container);
 
