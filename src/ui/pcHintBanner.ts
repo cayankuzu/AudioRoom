@@ -24,8 +24,8 @@ export function createPcHintBanner(
   parent: HTMLElement,
   opts: PcHintBannerOptions = {},
 ): PcHintBanner {
-  const visibleMs = opts.visibleMs ?? 3200;
-  const intervalMs = opts.intervalMs ?? 10000;
+  const visibleMs = opts.visibleMs ?? 2400;
+  const intervalMs = opts.intervalMs ?? 5000;
 
   const el = document.createElement("div");
   el.className = "pc-hint-banner";
@@ -65,7 +65,7 @@ export function createPcHintBanner(
     start() {
       if (intervalId !== null) return;
       /** İlk gösterim biraz gecikmeli — oyun başlar başlamaz rahatsız etmesin. */
-      window.setTimeout(show, 1800);
+      window.setTimeout(show, 1200);
       intervalId = window.setInterval(show, intervalMs);
     },
     stop() {

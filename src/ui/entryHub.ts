@@ -107,15 +107,48 @@ export function createEntryHub(
   parent.appendChild(root);
 
   let launchHandler: ((id: string) => void) | null = null;
+  let launching = false;
 
+  /**
+   * Kart aktivasyonu — anlık görsel feedback + kısa gecikme ile launch.
+   *
+   * Mobilde 3B sahnenin boot-up'ı 0.5-1 sn sürebilir; kullanıcı "bastım mı?"
+   * diye şüphe etmesin diye karta `is-launching` ekliyoruz. CSS bu sınıfla
+   * anında küçülme + parlama + altın çerçeve animasyonunu oynatır. 160ms
+   * sonra gerçek `launchHandler` (dispose + experience mount) tetiklenir.
+   */
   const activate = (el: HTMLElement | null) => {
     const id = el?.dataset.experienceId;
-    if (!id) return;
-    launchHandler?.(id);
+    if (!id || !el || launching) return;
+    launching = true;
+    el.classList.add("is-launching");
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => launchHandler?.(id), 160);
+    });
   };
 
   const onShelfClick = (e: MouseEvent) => {
     activate((e.target as HTMLElement).closest("[data-experience-id]") as HTMLElement | null);
+  };
+
+  /**
+   * `pointerdown` — tıklama hissi ANINDA verilir. :active pseudo-class
+   * zaten CSS tarafında feedback sağlar ama pointerdown ile card'ın
+   * tamamına extra vurgu (is-pressing) eklenebilir; şimdilik CSS :active
+   * yeterli. Ayrıca pointerdown'ı yutarak 300ms click-delay riski
+   * olabilen ender senaryoları önle.
+   */
+  const onShelfPointerDown = (e: PointerEvent) => {
+    const card = (e.target as HTMLElement).closest(
+      "[data-experience-id]",
+    ) as HTMLElement | null;
+    if (card) card.classList.add("is-pressing");
+  };
+  const onShelfPointerEnd = (e: PointerEvent) => {
+    const card = (e.target as HTMLElement).closest(
+      "[data-experience-id]",
+    ) as HTMLElement | null;
+    if (card) card.classList.remove("is-pressing");
   };
 
   const onShelfKey = (e: KeyboardEvent) => {
@@ -128,6 +161,10 @@ export function createEntryHub(
 
   shelf.addEventListener("click", onShelfClick);
   shelf.addEventListener("keydown", onShelfKey);
+  shelf.addEventListener("pointerdown", onShelfPointerDown);
+  shelf.addEventListener("pointerup", onShelfPointerEnd);
+  shelf.addEventListener("pointercancel", onShelfPointerEnd);
+  shelf.addEventListener("pointerleave", onShelfPointerEnd);
 
   return {
     element: root,
@@ -137,6 +174,10 @@ export function createEntryHub(
     dispose() {
       shelf.removeEventListener("click", onShelfClick);
       shelf.removeEventListener("keydown", onShelfKey);
+      shelf.removeEventListener("pointerdown", onShelfPointerDown);
+      shelf.removeEventListener("pointerup", onShelfPointerEnd);
+      shelf.removeEventListener("pointercancel", onShelfPointerEnd);
+      shelf.removeEventListener("pointerleave", onShelfPointerEnd);
       root.remove();
     },
   };

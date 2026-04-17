@@ -244,6 +244,9 @@ body {
   color: inherit;
   user-select: none;
   background: var(--eh-surface);
+  /** Mobilde 300ms dokunma gecikmesini kaldır — anında tetiklensin. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(167, 139, 250, 0.25);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow:
@@ -295,6 +298,43 @@ body {
 .entry-hub__card:focus-visible {
   outline: 2px solid var(--eh-cyan);
   outline-offset: 4px;
+}
+
+/* Mobil tıklama feedback — `:active` ve `.is-pressing` anında tetiklenir,
+ * hover olmadan da kullanıcıya "seçildi" hissi verir. Press/release
+ * arasında hafif küçülme + glow + cover scale birleşince dokunma çok
+ * daha responsive hissedilir. */
+.entry-hub__card:active,
+.entry-hub__card.is-pressing {
+  transform: translateY(-2px) scale(0.98);
+  transition: transform 90ms ease, box-shadow 120ms ease;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.55) inset,
+    0 22px 50px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(167, 139, 250, 0.28);
+}
+
+.entry-hub__card:active .entry-hub__card-glow,
+.entry-hub__card.is-pressing .entry-hub__card-glow {
+  opacity: 0.75 !important;
+  transition: opacity 80ms ease;
+}
+
+.entry-hub__card:active .entry-hub__cover-img,
+.entry-hub__card.is-pressing .entry-hub__cover-img {
+  transform: scale(1.04);
+  transition: transform 90ms ease;
+}
+
+.entry-hub__card.is-launching {
+  pointer-events: none;
+  transform: translateY(0) scale(0.96);
+  filter: brightness(1.1) saturate(1.2);
+  box-shadow:
+    0 0 0 2px rgba(244, 214, 117, 0.7) inset,
+    0 30px 80px rgba(0, 0, 0, 0.65),
+    0 0 120px rgba(167, 139, 250, 0.45);
+  transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
 }
 
 .entry-hub__cover-wrap {
@@ -2113,22 +2153,48 @@ body {
 
 /* ------- Toolbar (sağ üst) ------- */
 .mobile-controls__toolbar {
-  position: absolute;
-  right: max(0.6rem, env(safe-area-inset-right));
-  top: max(0.6rem, env(safe-area-inset-top));
+  position: fixed;
+  top: max(0.45rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 6px;
-  background: rgba(12, 12, 16, 0.55);
+  background: rgba(12, 12, 16, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  padding: 4px;
+  padding: 4px 6px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  /** Yatay scroll — butonlar ekrana sığmazsa sağa-sola kaydırılabilir. */
+  max-width: calc(100vw - 0.9rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  /** HER ŞEYİN ÜSTÜNDE. Panellerin (album-panel 22, minimap 18) üzerinde. */
+  z-index: 50;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.mobile-controls__toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-controls__tool-sep {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+  flex: 0 0 auto;
 }
 
 .mobile-controls__tool {
   width: 38px;
   height: 38px;
+  flex: 0 0 auto;
   display: grid;
   place-content: center;
   border-radius: 50%;
@@ -2139,6 +2205,10 @@ body {
   padding: 0;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
     transform 120ms ease;
+}
+
+.mobile-controls__tool--back {
+  color: rgba(244, 214, 117, 0.95);
 }
 
 .mobile-controls__tool svg {
@@ -2206,10 +2276,11 @@ body.is-touch .bright-panel {
   display: none !important;
 }
 
-/* Minimap — SOL ÜST, kompakt. Album panel açıkken altında kalır. */
+/* Minimap — SOL ÜST, toolbar'ın ALTINDA. Toolbar 44-52px'lik merkez
+ * pill olduğu için sol kenar boşta. Tıkabiliriz. */
 body.is-touch .minimap {
   left: max(0.35rem, env(safe-area-inset-left));
-  top: max(0.35rem, env(safe-area-inset-top));
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 54px);
   bottom: auto;
   right: auto;
   width: 128px;
@@ -2218,10 +2289,10 @@ body.is-touch .minimap {
   background: rgba(10, 10, 12, 0.72);
 }
 
+/* Kapatılınca TAMAMEN görünmez — header bar kalıntısı yok. Toolbar
+ * butonuna tekrar basarak açılır. */
 body.is-touch .minimap.is-collapsed {
-  width: auto;
-  min-width: 92px;
-  padding: 0.28rem 0.5rem 0.32rem;
+  display: none !important;
 }
 
 body.is-touch .minimap__head {
@@ -2238,18 +2309,19 @@ body.is-touch .minimap__canvas {
 /* ===========================================================
    ALBÜM PANELİ — MOBİL KOMPAKT
    Sadece başlık + parça listesi. iframe, progress, kontroller,
-   kicker/meta, tracks-head hepsi gizli. Sol üst köşede dursun,
-   toolbar + minimap ile çakışmayacak boyutta.
+   kicker/meta, tracks-head hepsi gizli. SAĞ ÜST (minimap sol üstte)
+   — böylece ikisi aynı anda açıksa üst üste binmez. Toolbar'ın
+   ALTINDA yerleşir.
    =========================================================== */
 body.is-touch .album-panel {
-  left: max(0.35rem, env(safe-area-inset-left));
-  right: auto;
-  top: calc(max(0.35rem, env(safe-area-inset-top)) + 46px);
+  left: auto;
+  right: max(0.35rem, env(safe-area-inset-right));
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 54px);
   bottom: auto;
   width: min(240px, 62vw);
   min-width: 180px;
   max-height: calc(
-    100dvh - max(0.35rem, env(safe-area-inset-top)) - 46px - 170px
+    100dvh - max(0.35rem, env(safe-area-inset-top)) - 54px - 170px
   );
   display: flex;
   flex-direction: column;
@@ -2328,10 +2400,10 @@ body.is-touch .album-panel__track-index {
   min-width: 1.4ch;
 }
 
-/* Kapalıyken sadece başlık çubuğu. */
+/* Kapatılınca TAMAMEN görünmez — header bar kalıntısı yok. Toolbar'daki
+ * liste butonuna tekrar basınca açılır. */
 body.is-touch .album-panel.is-collapsed {
-  max-height: none;
-  width: min(200px, 52vw);
+  display: none !important;
 }
 
 /* Experience back nav — sol üstte ama album/map ile çakışmasın;
@@ -2508,9 +2580,8 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
 
   body.is-touch .mobile-controls__toolbar {
     top: max(0.4rem, env(safe-area-inset-top));
-    right: max(0.4rem, env(safe-area-inset-right));
     gap: 5px;
-    padding: 3px;
+    padding: 3px 5px;
   }
 
   body.is-touch .mobile-controls__tool {
@@ -2520,14 +2591,17 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
 
   body.is-touch .album-panel {
     width: min(220px, 58vw);
-    top: calc(max(0.35rem, env(safe-area-inset-top)) + 44px);
+    right: max(0.35rem, env(safe-area-inset-right));
+    left: auto;
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 56px);
     max-height: calc(
-      100dvh - max(0.35rem, env(safe-area-inset-top)) - 44px - 182px
+      100dvh - max(0.35rem, env(safe-area-inset-top)) - 56px - 182px
     );
   }
 
   body.is-touch .minimap {
     width: 118px;
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 56px);
   }
 
   /* Dikey telefonda (dar) — interaction hint d-pad/action üstünde duruyor
@@ -2591,9 +2665,8 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
 
   body.is-touch .mobile-controls__toolbar {
     top: max(0.3rem, env(safe-area-inset-top));
-    right: max(0.3rem, env(safe-area-inset-right));
     gap: 4px;
-    padding: 2px;
+    padding: 2px 4px;
   }
 
   body.is-touch .mobile-controls__tool {
@@ -2616,15 +2689,17 @@ body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
 
   body.is-touch .minimap {
     width: 110px;
-    top: max(0.3rem, env(safe-area-inset-top));
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 44px);
   }
 
   body.is-touch .album-panel {
     width: min(220px, 42vw);
     min-width: 170px;
-    top: calc(max(0.3rem, env(safe-area-inset-top)) + 38px);
+    right: max(0.3rem, env(safe-area-inset-right));
+    left: auto;
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 44px);
     max-height: calc(
-      100dvh - max(0.3rem, env(safe-area-inset-top)) - 38px - 148px
+      100dvh - max(0.3rem, env(safe-area-inset-top)) - 44px - 148px
     );
   }
 

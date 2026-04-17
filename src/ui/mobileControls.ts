@@ -19,6 +19,8 @@ export interface MobileControlsOptions {
   onTogglePanel: () => void;
   onPause: () => void;
   onToggleFullscreen: () => void;
+  /** Kütüphaneye dön — toolbar'ın başındaki "geri" butonu. */
+  onGoBack: () => void;
 }
 
 /**
@@ -86,6 +88,10 @@ export function createMobileControls(
     </div>
 
     <div class="mobile-controls__toolbar" data-toolbar>
+      <button type="button" class="mobile-controls__tool mobile-controls__tool--back" data-tool="back" aria-label="Kütüphaneye dön">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="mobile-controls__tool-sep" aria-hidden="true"></span>
       <button type="button" class="mobile-controls__tool mobile-controls__tool--eye" data-tool="eye" aria-label="Arayüzü gizle / göster" aria-pressed="false">
         <svg class="mobile-controls__tool-eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         <svg class="mobile-controls__tool-eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -96,8 +102,8 @@ export function createMobileControls(
       <button type="button" class="mobile-controls__tool" data-tool="map" aria-label="Harita">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
       </button>
-      <button type="button" class="mobile-controls__tool" data-tool="panel" aria-label="Albüm paneli">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>
+      <button type="button" class="mobile-controls__tool" data-tool="panel" aria-label="Albüm paneli · Liste">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
       <button type="button" class="mobile-controls__tool mobile-controls__tool--fs" data-tool="fullscreen" aria-label="Tam ekran" aria-pressed="false">
         <svg class="mobile-controls__tool-fs-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -181,6 +187,7 @@ export function createMobileControls(
 
   /** Toolbar tek-dokunuşluk butonları (toggle) — tap with click. */
   const toolMap: Record<string, () => void> = {
+    back: opts.onGoBack,
     flashlight: opts.onToggleFlashlight,
     map: opts.onToggleMap,
     panel: opts.onTogglePanel,

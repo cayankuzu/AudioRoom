@@ -56,7 +56,7 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
         <div class="start-overlay__ctrl"><span>Shift</span><em>Koş</em></div>
       `;
   const noteHtml = isTouch
-    ? `<p class="start-overlay__note">Oyun tam ekranda başlayacak. Telefonu yatay tutmak tavsiye edilir.</p>`
+    ? `<p class="start-overlay__note">Daha iyi deneyim için <strong>bilgisayardan</strong> kullanmanız tavsiye edilir.</p>`
     : `<p class="start-overlay__note">Gramofona plak takılmadan müzik başlamaz.</p>`;
 
   el.innerHTML = `

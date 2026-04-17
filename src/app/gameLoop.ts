@@ -275,6 +275,19 @@ export function startExperience(container: HTMLElement): void {
         onToggleFullscreen: () => {
           void toggleFullscreen();
         },
+        /**
+         * Kütüphaneye dön — sayfa yenileme. Experience state'ini temiz
+         * bırakır; bootstrap entry hub'ı yeniden mount eder.
+         */
+        onGoBack: () => {
+          if (
+            window.confirm(
+              "Kütüphaneye dönmek istediğinize emin misiniz? Mevcut oturum sonlanır.",
+            )
+          ) {
+            window.location.reload();
+          }
+        },
       })
     : null;
 
@@ -290,10 +303,12 @@ export function startExperience(container: HTMLElement): void {
     document.body.classList.add("is-touch");
     mobileControls?.setVisible(false);
     /**
-     * Harita varsayılan olarak kapalı başlasın — sol üst köşede albüm paneli
-     * ile çakışmasın. Oyuncu harita butonundan tekrar açabilir.
+     * Mobilde tüm paneller başlangıçta kapalı — ekran tertemiz. Oyuncu
+     * üst toolbar'daki butonlarla ihtiyaç duydukça açar. Bu sayede
+     * küçük ekranda başlangıçta paneller üst üste binmez.
      */
     if (minimap.isOpen()) minimap.toggle();
+    if (albumPanel.isOpen()) albumPanel.toggle();
     tryHideMobileAddressBar();
     window.addEventListener("orientationchange", tryHideMobileAddressBar);
     /** Fullscreen state → toolbar butonunun görünümü senkronize. */
@@ -497,15 +512,36 @@ export function startExperience(container: HTMLElement): void {
     albumPanel.refreshInventory();
   });
 
-  startOverlay.onStart(() => {
+  startOverlay.onStart(async () => {
     /**
-     * Mobilde: start user-gesture'i sırasında fullscreen iste. Zorunlu değil
-     * — iOS Safari API'yi desteklemeyebilir; reddedildiğinde oyun yine
-     * başlar ve scroll trick ile adres barı olabildiğince gizlenir.
+     * MOBİL · TAM EKRAN ZORUNLU
+     *
+     * Fullscreen API'si desteklenen cihazlarda (Android Chrome, Edge,
+     * Samsung Internet, iPad Safari, masaüstü tarayıcıları vs.) oyunun
+     * başlaması fullscreen'e geçmeye bağlı. Kullanıcı reddederse oyun
+     * başlamaz; overlay açık kalır ve "bir daha dene" gibi çalışır.
+     *
+     * iOS iPhone'da Fullscreen API yoktur — `isFullscreenSupported()`
+     * false döner; burada istisnaen scroll-trick ile adres barını
+     * gizleyip oyunu başlatıyoruz (aksi halde iPhone kullanıcıları
+     * kilitlenir).
      */
     if (input.isTouch) {
-      void toggleFullscreenForStart();
-      tryHideMobileAddressBar();
+      if (isFullscreenSupported()) {
+        if (!isFullscreen()) {
+          try {
+            await requestFullscreen(document.documentElement);
+          } catch {
+            /** Reddedildi veya başarısız — overlay açık kalsın, oyuna geçme. */
+            return;
+          }
+          /** Double-check: bazı tarayıcılarda reject gelmeden de FS girişi olmaz. */
+          if (!isFullscreen()) return;
+        }
+      } else {
+        /** iOS iPhone fallback — scroll ile adres barını gizle, yine de başlat. */
+        tryHideMobileAddressBar();
+      }
     }
     input.requestLock();
     /**
@@ -514,15 +550,6 @@ export function startExperience(container: HTMLElement): void {
      */
     ambient.start();
   });
-
-  async function toggleFullscreenForStart(): Promise<void> {
-    if (isFullscreen() || !isFullscreenSupported()) return;
-    try {
-      await requestFullscreen(document.documentElement);
-    } catch {
-      /* iOS iPhone vs — sessizce geç */
-    }
-  }
 
   input.onLockChange((locked) => {
     if (locked) {
