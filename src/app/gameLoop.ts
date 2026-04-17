@@ -299,6 +299,14 @@ export function startExperience(container: HTMLElement): void {
   const pcHintBanner = input.isTouch ? createPcHintBanner(container) : null;
   let unwatchFullscreen: (() => void) | null = null;
 
+  /**
+   * Deneyim sahnesi aktifken body'e `is-in-experience` sınıfı ekle —
+   * kütüphane seviyesinde global olan rotate-hint pill'i oyun ekranında
+   * gizlensin (pc-hint-banner + start-overlay notu zaten aynı bilgiyi
+   * içeriyor, ekran kirlenmesin).
+   */
+  document.body.classList.add("is-in-experience");
+
   if (input.isTouch) {
     document.body.classList.add("is-touch");
     mobileControls?.setVisible(false);

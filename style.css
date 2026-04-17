@@ -691,6 +691,17 @@ body {
   font-style: italic;
 }
 
+/* Rotate uyarı notu — altın aksan, italic değil, dikkat çeksin. */
+.start-overlay__note--rotate {
+  margin-top: 0.5rem;
+  color: #f4d675;
+  font-style: normal;
+  letter-spacing: 0.05em;
+}
+.start-overlay__note--rotate strong {
+  color: #fff2c7;
+}
+
 .hud {
   position: absolute;
   top: 1rem;
@@ -2535,6 +2546,124 @@ body.is-touch .pc-hint-banner {
 body.is-ui-hidden .pc-hint-banner {
   opacity: 0 !important;
   transform: translate(-50%, -10px) !important;
+}
+
+/* =========================================================================
+   ROTATE HINT — "Telefonu yan çevirin" üst pill
+   -------------------------------------------------------------------------
+   Kapsam: yalnızca dokunmatik + dikey (portrait) modda görünür.
+   Yerleşim: üst-orta, safe-area farkında, toolbar'la çakışmasın diye DÜŞÜK
+   z-index (toolbar 50 > bu). Deneyim sahnesinde (`body.is-in-experience`)
+   gizlenir — pc-hint-banner + inline start-overlay notu yeterli.
+   ========================================================================= */
+.rotate-hint {
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translate(-50%, -12px);
+  z-index: 40;
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem 0.45rem 0.65rem;
+  background: linear-gradient(
+    180deg,
+    rgba(26, 18, 10, 0.92),
+    rgba(14, 10, 6, 0.92)
+  );
+  color: #f1e9d8;
+  border: 1px solid rgba(244, 214, 117, 0.45);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  max-width: calc(100vw - 1.2rem);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms ease, transform 320ms ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.rotate-hint.is-visible {
+  display: inline-flex;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.rotate-hint strong {
+  color: #ffe07a;
+  font-weight: 700;
+}
+
+.rotate-hint__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f4d675;
+  animation: rotate-hint-spin 2.4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes rotate-hint-spin {
+  0%, 58%, 100% { transform: rotate(0deg); }
+  70% { transform: rotate(-90deg); }
+  88% { transform: rotate(-90deg); }
+}
+
+.rotate-hint__text {
+  line-height: 1.15;
+  white-space: normal;
+  font-size: 0.7rem;
+}
+
+.rotate-hint__close {
+  all: unset;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgba(241, 233, 216, 0.7);
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 400;
+  margin-left: 0.2rem;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.rotate-hint__close:hover,
+.rotate-hint__close:active {
+  background: rgba(244, 214, 117, 0.18);
+  color: #fff;
+}
+
+/* Deneyim sahnesinde: pc-hint-banner ve inline overlay notu yeterli —
+   başka bir üst pill ile ekran kalabalıklaşmasın. */
+body.is-in-experience .rotate-hint {
+  display: none !important;
+}
+
+/* UI gizliyken (göz butonu) rotate hint de saklansın. */
+body.is-ui-hidden .rotate-hint {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Küçük ekranlar — daha kompakt */
+@media (max-width: 420px) {
+  .rotate-hint {
+    font-size: 0.62rem;
+    padding: 0.38rem 0.6rem 0.38rem 0.5rem;
+    letter-spacing: 0.04em;
+  }
+  .rotate-hint__text {
+    font-size: 0.62rem;
+  }
 }
 
 /* ===========================================================
