@@ -244,7 +244,6 @@ export function startExperience(container: HTMLElement): void {
         onToggleFlashlight: () => flashlight.toggle(),
         onToggleMap: () => minimap.toggle(),
         onTogglePanel: () => albumPanel.toggle(),
-        onToggleHud: () => hud.toggle(),
         onToggleBrightness: () => brightness.toggle(),
         onPause: () => input.releaseLock(),
       })

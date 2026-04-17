@@ -2182,28 +2182,28 @@ body.is-touch #experience {
   height: 100dvh;
 }
 
-/* Mobil: HUD panelini (Kontroller kartı) varsayılan kapalı başlat — butonla açılır. */
-body.is-touch .hud {
-  top: 0.5rem;
-  left: 0.5rem;
-  min-width: 130px;
-  font-size: 0.68rem;
-  padding: 0.4rem 0.55rem 0.45rem;
+/* Mobilde HUD (Kontroller kartı) ve Ekran Görüntüsü / Paylaş paneli
+ * tamamen gizlidir — klavyeye özel bir arayüz, dokunmatik UX'i kirletmesin. */
+body.is-touch .hud,
+body.is-touch .capture-panel {
+  display: none !important;
 }
 
-/* Minimap — toolbar ile çakışmaması için sol-alt tarafta, d-pad'in üstünde kal */
+/* Minimap — SOL ÜST. Toolbar sağ üstte olduğu için çakışma yok. */
 body.is-touch .minimap {
-  left: 0.4rem;
-  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 178px);
-  width: 140px;
+  left: max(0.4rem, env(safe-area-inset-left));
+  top: max(0.4rem, env(safe-area-inset-top));
+  bottom: auto;
+  right: auto;
+  width: 150px;
   padding: 0.35rem 0.4rem 0.4rem;
   z-index: 20;
-  background: rgba(10, 10, 12, 0.68);
+  background: rgba(10, 10, 12, 0.7);
 }
 
 body.is-touch .minimap.is-collapsed {
   width: auto;
-  min-width: 94px;
+  min-width: 98px;
   padding: 0.32rem 0.5rem 0.36rem;
 }
 
@@ -2213,30 +2213,53 @@ body.is-touch .minimap__head {
   padding: 0 0.2rem 0.25rem;
 }
 
-/* Album paneli — sağ-alt çakışır, onu action butonlarının ÜSTÜNE çıkar */
+/* Album paneli — mobile: SOL tarafta, tam yüksekliği ölçekli kullan, içerisi
+ * gerekirse kayar. YouTube embed + kontroller + parça listesi dikey
+ * düzende. Minimap ile çakışır ama albüm paneli açıkken minimap geçici
+ * olarak arkada kalır; kapatınca tekrar görünür. */
 body.is-touch .album-panel {
-  right: 0.5rem;
-  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 172px);
-  width: min(340px, 55vw);
-  min-width: 210px;
+  left: max(0.4rem, env(safe-area-inset-left));
+  right: auto;
+  top: max(0.4rem, env(safe-area-inset-top));
+  bottom: auto;
+  width: min(320px, 62vw);
+  min-width: 200px;
+  max-height: calc(100dvh - max(0.8rem, env(safe-area-inset-top)) - 0.4rem);
+  display: flex;
+  flex-direction: column;
+  z-index: 22;
 }
 
-/* Parlaklık paneli — toolbar ile çakışmaması için toolbar'ın altında */
+/* Açıkken iç kısım kayabilir — telefon dik modunda bile parça listesi ve
+ * video üst üste taşmadan yerleşir. */
+body.is-touch .album-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 0.55rem 0.6rem;
+}
+
+body.is-touch .album-panel__frame-wrap {
+  flex: 0 0 auto;
+}
+
+body.is-touch .album-panel__list {
+  max-height: 140px;
+}
+
+/* Kapalıyken minimal header bar — minimap'in hemen altında dursun. */
+body.is-touch .album-panel.is-collapsed {
+  max-height: none;
+  width: min(240px, 55vw);
+}
+
+/* Parlaklık paneli — toolbar sağ ÜSTTE ama ana içerikten uzakta olsun
+ * diye toolbar'ın hemen ALTINDA (44px kaydırılmış) sağa hizalı kalır. */
 body.is-touch .bright-panel {
   top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px);
-  right: 0.5rem;
+  right: max(0.5rem, env(safe-area-inset-right));
   min-width: 180px;
   padding: 0.4rem 0.55rem;
-}
-
-body.is-touch .capture-panel {
-  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px + 140px);
-  right: 0.5rem;
-  min-width: 180px;
-}
-
-body.is-touch .bright-panel--collapsed ~ .capture-panel {
-  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px + 42px);
 }
 
 /* Experience back nav — mobilde hud ile çakışır, sağ üst yerine gizleme.
@@ -2354,21 +2377,19 @@ body.is-touch .start-overlay__cta {
     height: 17px;
   }
 
-  body.is-touch .hud {
-    font-size: 0.6rem;
-    min-width: 118px;
-    padding: 0.32rem 0.5rem 0.4rem;
-  }
-
   body.is-touch .minimap {
-    width: 124px;
-    bottom: calc(0.6rem + 156px);
+    width: 128px;
+    top: 0.35rem;
   }
 
   body.is-touch .album-panel {
-    width: min(280px, 42vw);
-    min-width: 190px;
-    bottom: calc(0.6rem + 150px);
+    width: min(300px, 48vw);
+    min-width: 180px;
+    top: 0.35rem;
+  }
+
+  body.is-touch .album-panel__list {
+    max-height: 110px;
   }
 
   body.is-touch .interaction-hint {
@@ -2380,21 +2401,9 @@ body.is-touch .start-overlay__cta {
     display: none;
   }
 
-  body.is-touch .bright-panel,
-  body.is-touch .capture-panel {
-    min-width: 148px;
-  }
-
   body.is-touch .bright-panel {
+    min-width: 152px;
     top: calc(0.35rem + 44px);
-  }
-
-  body.is-touch .capture-panel {
-    top: calc(0.35rem + 44px + 126px);
-  }
-
-  body.is-touch .bright-panel--collapsed ~ .capture-panel {
-    top: calc(0.35rem + 44px + 40px);
   }
 }
 
@@ -2407,12 +2416,80 @@ body.is-touch .start-overlay__cta {
 
   body.is-touch .album-panel {
     width: min(92vw, 360px);
-    bottom: calc(0.6rem + 184px);
+    top: max(0.4rem, env(safe-area-inset-top));
+    max-height: calc(100dvh - 200px);
   }
 
   body.is-touch .minimap {
-    width: 128px;
-    bottom: calc(0.6rem + 184px);
+    width: 140px;
   }
+}
+
+/* =================================================================
+   EYE (Göz) BUTONU — tüm mobil UI'yi gizle / göster
+   ================================================================= */
+
+/* Göz butonu — normalde "open" svg görünür, closed svg gizli */
+.mobile-controls__tool-eye-open,
+.mobile-controls__tool-eye-closed {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-controls__tool-eye-closed {
+  display: none;
+}
+
+/* UI gizliyken göz üzerinde çapraz çizgili "closed" svg görünür */
+body.is-ui-hidden .mobile-controls__tool-eye-open {
+  display: none;
+}
+
+body.is-ui-hidden .mobile-controls__tool-eye-closed {
+  display: inline-block;
+}
+
+/* Göz butonu aktif durumda (basılı) vurgu */
+.mobile-controls__tool--eye[aria-pressed="true"] {
+  background: rgba(244, 214, 117, 0.22);
+  border-color: rgba(244, 214, 117, 0.55);
+  color: #fff;
+}
+
+/**
+ * is-ui-hidden: Göz butonu HARİÇ tüm mobil arayüzü gizle.
+ *  - D-pad, aksiyon butonları, minimap, albüm paneli, parlaklık paneli,
+ *    etkileşim ipucu, kütüphane dön butonu, brand footer → opacity 0 +
+ *    pointer-events none (fade + tıklama yok).
+ *  - Toolbar'daki göz dışındaki tüm butonlar da gizlenir.
+ *  - Göz butonu kendisi görünür kalır; oyuncu UI'yi geri getirebilsin.
+ *
+ * Kamera sürükleme / oyun akışı etkilenmez — canvas üzerinde parmakla
+ * hâlâ bakış ve tap-to-lock çalışmaya devam eder.
+ */
+body.is-ui-hidden .mobile-controls__dpad,
+body.is-ui-hidden .mobile-controls__actions,
+body.is-ui-hidden .minimap,
+body.is-ui-hidden .album-panel,
+body.is-ui-hidden .bright-panel,
+body.is-ui-hidden .hud,
+body.is-ui-hidden .capture-panel,
+body.is-ui-hidden .experience-back-nav,
+body.is-ui-hidden .brand-footer,
+body.is-ui-hidden .interaction-hint {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 160ms ease;
+}
+
+body.is-ui-hidden .mobile-controls__toolbar > .mobile-controls__tool:not(.mobile-controls__tool--eye) {
+  display: none;
+}
+
+/* Göz butonu çevresindeki toolbar arkaplanını da mat tut — yalnız göz
+ * kalınca çok küçük bir pill gibi görünsün. */
+body.is-ui-hidden .mobile-controls__toolbar {
+  background: rgba(12, 12, 16, 0.5);
+  padding: 3px;
 }
 

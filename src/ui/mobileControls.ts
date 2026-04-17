@@ -18,7 +18,6 @@ export interface MobileControlsOptions {
   onToggleFlashlight: () => void;
   onToggleMap: () => void;
   onTogglePanel: () => void;
-  onToggleHud: () => void;
   onToggleBrightness: () => void;
   onPause: () => void;
 }
@@ -85,6 +84,10 @@ export function createMobileControls(
     </div>
 
     <div class="mobile-controls__toolbar" data-toolbar>
+      <button type="button" class="mobile-controls__tool mobile-controls__tool--eye" data-tool="eye" aria-label="Arayüzü gizle / göster" aria-pressed="false">
+        <svg class="mobile-controls__tool-eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg class="mobile-controls__tool-eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
       <button type="button" class="mobile-controls__tool" data-tool="flashlight" aria-label="Fener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l-2 5H8zM8 9h8v4l-1 9h-6l-1-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
       </button>
@@ -93,9 +96,6 @@ export function createMobileControls(
       </button>
       <button type="button" class="mobile-controls__tool" data-tool="panel" aria-label="Albüm paneli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>
-      </button>
-      <button type="button" class="mobile-controls__tool" data-tool="hud" aria-label="Kontroller listesi">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
       <button type="button" class="mobile-controls__tool" data-tool="brightness" aria-label="Parlaklık">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.5 5.5l1.5 1.5M17 17l1.5 1.5M5.5 18.5L7 17M17 7l1.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -167,14 +167,29 @@ export function createMobileControls(
     releaseHandlers.set(btn, onUp);
   });
 
+  /**
+   * GÖZ (eye) butonu — tüm mobil UI'yi tek dokunuşta gizler/gösterir.
+   * Göz butonu daima görünür kalır; diğer her şey (d-pad, aksiyon,
+   * toolbar'ın geri kalanı, minimap, albüm paneli, parlaklık paneli,
+   * etkileşim ipucu) `body.is-ui-hidden` sınıfı ile CSS tarafında
+   * gizlenir. Göz üzerinde çapraz çizgi varyantı ile durum belli olur.
+   */
+  let uiHidden = false;
+  function toggleEye(): void {
+    uiHidden = !uiHidden;
+    document.body.classList.toggle("is-ui-hidden", uiHidden);
+    const eyeBtn = root.querySelector<HTMLButtonElement>('[data-tool="eye"]');
+    if (eyeBtn) eyeBtn.setAttribute("aria-pressed", String(uiHidden));
+  }
+
   /** Toolbar tek-dokunuşluk butonları (toggle) — tap with click. */
   const toolMap: Record<string, () => void> = {
     flashlight: opts.onToggleFlashlight,
     map: opts.onToggleMap,
     panel: opts.onTogglePanel,
-    hud: opts.onToggleHud,
     brightness: opts.onToggleBrightness,
     pause: opts.onPause,
+    eye: toggleEye,
   };
   const toolBtns = root.querySelectorAll<HTMLButtonElement>("[data-tool]");
   toolBtns.forEach((btn) => {
@@ -279,6 +294,7 @@ export function createMobileControls(
       lookTarget.removeEventListener("pointerup", onCanvasPointerEnd);
       lookTarget.removeEventListener("pointercancel", onCanvasPointerEnd);
       document.removeEventListener("gesturestart", onGestureStart);
+      document.body.classList.remove("is-ui-hidden");
       root.remove();
     },
   };
