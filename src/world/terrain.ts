@@ -125,11 +125,16 @@ export function createTerrain(): TerrainHandle {
   const pos = geometry.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
 
-  /** Volkanik kum: antrasit → kömür → füme geçişi; her yer kapkara değil. */
-  const colDune = new THREE.Color("#1a1a1d");
-  const colFlat = new THREE.Color("#141416");
-  const colDeep = new THREE.Color("#1d2126");
-  const colRim = new THREE.Color("#24242a");
+  /**
+   * Volkanik kum — antrasit → kömür → füme geçişi; her yer kapkara değil.
+   * Tonlar biraz yukarı çekildi ki post-grading contrast 1.02 + lift 0.035
+   * ile birlikte yüzey okunabilir kalsın. Hâlâ "koyu volkanik siyah" ama
+   * crush değil.
+   */
+  const colDune = new THREE.Color("#26272b");
+  const colFlat = new THREE.Color("#1d1e22");
+  const colDeep = new THREE.Color("#242830");
+  const colRim = new THREE.Color("#2f3036");
 
   const {
     colorMap,
@@ -172,7 +177,13 @@ export function createTerrain(): TerrainHandle {
     metalness: 0.02,
     roughnessMap,
     normalMap,
-    normalScale: new THREE.Vector2(0.95, 0.95),
+    normalScale: new THREE.Vector2(1.05, 1.05),
+    /**
+     * Kum tanelerinin grazing angle'da yakaladığı hafif ışığı temsil eden
+     * bir taban emissive — shader içinde view-angle'a göre modüle edilir.
+     */
+    emissive: new THREE.Color("#2a2216"),
+    emissiveIntensity: 0.0,
   });
 
   /**
@@ -191,14 +202,26 @@ export function createTerrain(): TerrainHandle {
     uMacroVariation: { value: THREE.Texture };
     uMacroRepeat: { value: number };
     uMacroStrength: { value: number };
+    uSparkleTint: { value: THREE.Color };
+    uSparkleStrength: { value: number };
+    uSunDirWorld: { value: THREE.Vector3 };
   };
   const extendedUniforms: ExtendedUniforms = {
     uDetailNormal: { value: detailNormalMap },
     uDetailRepeat: { value: 240.0 },
-    uDetailStrength: { value: 0.55 },
+    uDetailStrength: { value: 0.62 },
     uMacroVariation: { value: macroVariationMap },
     uMacroRepeat: { value: 1.4 },
-    uMacroStrength: { value: 0.22 },
+    uMacroStrength: { value: 0.26 },
+    /**
+     * Grazing kum parıltısı — monokrom referansa uygun NÖTR açık gri/beyaz.
+     * Güç düşürüldü (0.22) ki parıltı "renkli vurgu" yapmasın, sadece
+     * fiziksel bir mikro highlight olarak hissedilsin.
+     */
+    uSparkleTint: { value: new THREE.Color("#eeeeee") },
+    uSparkleStrength: { value: 0.22 },
+    /** Güneşten geliyormuş gibi bir yön (lights.ts ile uyumlu). */
+    uSunDirWorld: { value: new THREE.Vector3(-45, 52, -72).normalize() },
   };
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uDetailNormal = extendedUniforms.uDetailNormal;
@@ -207,6 +230,14 @@ export function createTerrain(): TerrainHandle {
     shader.uniforms.uMacroVariation = extendedUniforms.uMacroVariation;
     shader.uniforms.uMacroRepeat = extendedUniforms.uMacroRepeat;
     shader.uniforms.uMacroStrength = extendedUniforms.uMacroStrength;
+    shader.uniforms.uSparkleTint = extendedUniforms.uSparkleTint;
+    shader.uniforms.uSparkleStrength = extendedUniforms.uSparkleStrength;
+    shader.uniforms.uSunDirWorld = extendedUniforms.uSunDirWorld;
+
+    /** Grazing-angle sparkle için view-space vektörleri gerekir; vViewPosition
+     *  zaten MeshStandardMaterial tarafından sağlanır. World normal hesabı için
+     *  vertex shader'a küçük bir çıkış ekliyoruz (zaten mevcut vNormal'i
+     *  kullanabiliriz — view-space). */
 
     /**
      * Three.js r152+ her map için ayrı UV varying kullanıyor:
@@ -224,7 +255,10 @@ export function createTerrain(): TerrainHandle {
           uniform float uDetailStrength;
           uniform sampler2D uMacroVariation;
           uniform float uMacroRepeat;
-          uniform float uMacroStrength;`,
+          uniform float uMacroStrength;
+          uniform vec3 uSparkleTint;
+          uniform float uSparkleStrength;
+          uniform vec3 uSunDirWorld;`,
       )
       .replace(
         "#include <normal_fragment_maps>",
@@ -243,6 +277,12 @@ export function createTerrain(): TerrainHandle {
             float macroVar = texture2D(uMacroVariation, vMapUv * uMacroRepeat).r;
             float macroMix = (macroVar - 0.5) * 2.0 * uMacroStrength;
             diffuseColor.rgb *= (1.0 + macroMix);
+            /**
+             * Kanalları dengele → NÖTR gri siyah kum hissi (renk kayması
+             * yok). Üç kanalı ortalamaya çek: mavi/sıcak shift uygulanmaz.
+             */
+            float greyAvg = dot(diffuseColor.rgb, vec3(0.333));
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(greyAvg), 0.35);
           #endif`,
       )
       .replace(
@@ -250,8 +290,35 @@ export function createTerrain(): TerrainHandle {
         `#include <roughnessmap_fragment>
           #ifdef USE_ROUGHNESSMAP
             float macroVarR = texture2D(uMacroVariation, vRoughnessMapUv * uMacroRepeat).r;
-            roughnessFactor = clamp(roughnessFactor + (macroVarR - 0.5) * 0.22, 0.35, 1.0);
+            /** Daha geniş bir roughness aralığı — ışık bölgeleri belirgin olsun. */
+            roughnessFactor = clamp(roughnessFactor + (macroVarR - 0.5) * 0.32, 0.28, 1.0);
           #endif`,
+      )
+      .replace(
+        "#include <lights_fragment_end>",
+        `#include <lights_fragment_end>
+          /**
+           * --- Grazing angle sand sparkle ---
+           * Kumun yatay ışıkta (sabah/akşam) yakaladığı mikro parıltıyı
+           * taklit eder. Yalnızca:
+           *   (a) view vektörü yüzeye teğet ise (grazing),
+           *   (b) ışık ters yönden (arka/yan) geliyorsa,
+           *   (c) detail normal haritasının "parlak" bir taneciği ise
+           * aktif olur. Böylece sahne geneline spam parıltı bulaşmaz.
+           */
+          {
+            vec3 V = normalize(vViewPosition);
+            float graze = 1.0 - clamp(dot(normalize(normal), V), 0.0, 1.0);
+            float sparkleMask = texture2D(uDetailNormal, vNormalMapUv * uDetailRepeat * 0.85).z;
+            sparkleMask = smoothstep(0.45, 0.95, sparkleMask);
+            float viewDist = length(vViewPosition);
+            float nearCut = 1.0 - smoothstep(0.5, 32.0, viewDist);
+            /** Güneş yönüne bakan teğetlerde daha güçlü — backlight uyumu. */
+            float sunKick = clamp(1.0 - dot(normalize(normal), normalize(uSunDirWorld)), 0.0, 1.0);
+            float sparkle = pow(graze, 5.5) * sparkleMask * nearCut * sunKick;
+            reflectedLight.directDiffuse += uSparkleTint * (sparkle * uSparkleStrength);
+          }
+        `,
       );
   };
   material.needsUpdate = true;

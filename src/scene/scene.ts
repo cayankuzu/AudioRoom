@@ -1,23 +1,25 @@
 import * as THREE from "three";
 
 /**
- * Siyah volkanik çöl — soğuk, gri-antrasit bir ufuk sisi.
+ * Siyah volkanik çöl — NÖTR gri-beyaz bir ufuk. Referans: albüm kapak
+ * fotoğrafı. Ton ailesi: kömür siyahı → antrasit → açık gri → kırık beyaz.
+ * Renk kayması YOK; sahne monokromdur (sadece "REDD" yazısı kırmızıdır).
  *
- * Sis felsefesi (sinematik derinlik):
- *  - `FogExp2` ile mesafe üssel şekilde yutulur → sert bir duvar yerine
- *    yumuşak ve doğal bir atmosferik perspektif.
- *  - Yoğunluk düşük tutulur (0.0048) → foreground ve midground okunurluğu
- *    bozulmaz; uzak kayalar ve tepeler mat bir hale bürünür.
- *  - Arkaplan rengi sis tonuyla aynı aileden: ufuk kaybolurken gökyüzüyle
- *    ton tutarlı kalır.
+ * Sis felsefesi:
+ *  - `FogExp2` ile mesafe üssel şekilde yutulur → yumuşak atmosferik
+ *    perspektif, sert "kesme" yok.
+ *  - Yoğunluk 0.0052: foreground net, midground yumuşak, uzak silinir.
+ *  - Arkaplan rengi gökyüzü horizon haze'i ile birebir uyumlu (açık gri
+ *    → ufuk kaybolurken sky ile tutarlı).
  */
 export function createScene(): THREE.Scene {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#c2c4c6");
+  scene.background = new THREE.Color("#bdc0c3");
   /**
-   * FogExp2 = e^(-(density·distance)^2). 0.0048 ≈ 60m'de %20, 120m'de %56
-   * yutma — derin, sinematik, ama ön plan net.
+   * Density 0.0042 → referans fotoğrafta midground hâlâ okunur, sadece
+   * en uzak hat haze ile yumuşuyor. Daha önce 0.0057 idi: o değerde
+   * sahne "duvar gibi" griye kesiliyordu.
    */
-  scene.fog = new THREE.FogExp2("#b3b7bb", 0.0048);
+  scene.fog = new THREE.FogExp2("#b2b5b8", 0.0042);
   return scene;
 }

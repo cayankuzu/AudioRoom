@@ -33,6 +33,12 @@ export interface CaptureControlsOptions {
 }
 
 export interface CaptureControls {
+  /**
+   * Ekran görüntüsü akışını dışarıdan (örn. klavye kısayolu) tetiklemek
+   * için. Butona tıklamak ile birebir aynı davranış: capture → preview
+   * modal → kaydet/kopyala/kapat.
+   */
+  takeScreenshot(): void;
   dispose(): void;
 }
 
@@ -49,7 +55,7 @@ export function createCaptureControls(
   const root = document.createElement("div");
   root.className = "capture-panel";
   root.innerHTML = `
-    <button type="button" class="capture-panel__btn" data-action="shot" title="Ekran görüntüsü al">
+    <button type="button" class="capture-panel__btn" data-action="shot" title="Ekran görüntüsü al (T)">
       <span class="capture-panel__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 7h3l1.6-2h6.8L17 7h3v12H4z" />
@@ -95,20 +101,31 @@ export function createCaptureControls(
     }, 2200);
   }
 
-  /** --- Ekran görüntüsü --- */
-  shotBtn.addEventListener("click", () => {
+  /**
+   * --- Ekran görüntüsü ---
+   * Ortak akış: buton tıklaması da, T klavye kısayolu da bu fonksiyonu
+   * çağırır. Bir preview modal zaten açıksa yenisini açmayız (çift
+   * basışlara karşı güvenlik).
+   */
+  let previewOpen = false;
+  function takeScreenshot(): void {
+    if (previewOpen) return;
     try {
       const dataUrl = options.captureScreenshot();
       if (!dataUrl || !dataUrl.startsWith("data:image/")) {
         showToast("Ekran görüntüsü alınamadı.", "err");
         return;
       }
-      openScreenshotPreview(dataUrl, showToast);
+      previewOpen = true;
+      openScreenshotPreview(dataUrl, showToast, () => {
+        previewOpen = false;
+      });
     } catch (err) {
       console.warn("[Capture] Ekran görüntüsü hatası:", err);
       showToast("Ekran görüntüsü alınamadı.", "err");
     }
-  });
+  }
+  shotBtn.addEventListener("click", takeScreenshot);
 
   /** --- Paylaş --- */
   shareBtn.addEventListener("click", async () => {
@@ -157,6 +174,7 @@ export function createCaptureControls(
   });
 
   return {
+    takeScreenshot,
     dispose() {
       if (toastTimer !== null) window.clearTimeout(toastTimer);
       root.remove();
@@ -174,6 +192,7 @@ export function createCaptureControls(
 function openScreenshotPreview(
   dataUrl: string,
   showToast: (msg: string, kind?: "info" | "ok" | "err") => void,
+  onClose?: () => void,
 ): void {
   const overlay = document.createElement("div");
   overlay.className = "shot-preview";
@@ -240,10 +259,14 @@ function openScreenshotPreview(
     }
   });
 
+  let dismissed = false;
   function dismiss(): void {
+    if (dismissed) return;
+    dismissed = true;
     overlay.classList.add("is-closing");
     window.setTimeout(() => overlay.remove(), 180);
     document.removeEventListener("keydown", onKey);
+    if (onClose) onClose();
   }
 
   dismissBtn.addEventListener("click", dismiss);

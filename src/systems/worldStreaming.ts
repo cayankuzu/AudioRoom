@@ -101,8 +101,23 @@ export function bucketInstancedMeshes(
     const receiveShadow = src.receiveShadow;
     const sourceName = src.name || "rocks:layer";
 
-    /** Instance'ları hücrelere göre sınıflandır. */
-    const cellMap = new Map<string, { mats: THREE.Matrix4[]; maxScale: number; cx: number; cz: number }>();
+    /**
+     * Instance'ları hücrelere göre sınıflandır. Kaynak mesh'in
+     * `instanceColor`'ı varsa, onu da hücre-başına aktarırız — yoksa
+     * rocks.ts'in ürettiği per-instance ton çeşitliliği bucketing'den
+     * sonra kaybolurdu.
+     */
+    const srcColor = src.instanceColor as THREE.InstancedBufferAttribute | null;
+    const cellMap = new Map<
+      string,
+      {
+        mats: THREE.Matrix4[];
+        colors: number[] | null;
+        maxScale: number;
+        cx: number;
+        cz: number;
+      }
+    >();
 
     for (let i = 0; i < src.count; i += 1) {
       src.getMatrixAt(i, tmpMat);
@@ -114,6 +129,7 @@ export function bucketInstancedMeshes(
       if (!bucket) {
         bucket = {
           mats: [],
+          colors: srcColor ? [] : null,
           maxScale: 0,
           cx: (gx + 0.5) * opts.cellSize,
           cz: (gz + 0.5) * opts.cellSize,
@@ -121,6 +137,12 @@ export function bucketInstancedMeshes(
         cellMap.set(key, bucket);
       }
       bucket.mats.push(tmpMat.clone());
+      if (srcColor && bucket.colors) {
+        const r = srcColor.getX(i);
+        const g = srcColor.getY(i);
+        const b = srcColor.getZ(i);
+        bucket.colors.push(r, g, b);
+      }
       const s = Math.max(tmpScale.x, tmpScale.y, tmpScale.z);
       if (s > bucket.maxScale) bucket.maxScale = s;
     }
@@ -137,6 +159,15 @@ export function bucketInstancedMeshes(
       }
       mesh.instanceMatrix.needsUpdate = true;
       mesh.frustumCulled = true;
+
+      if (bucket.colors && bucket.colors.length === bucket.mats.length * 3) {
+        const colorAttr = new THREE.InstancedBufferAttribute(
+          new Float32Array(bucket.colors),
+          3,
+        );
+        mesh.instanceColor = colorAttr;
+        colorAttr.needsUpdate = true;
+      }
 
       /**
        * Doğru bounding sphere: hücre merkezinde, hücrenin köşegenini

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BRIGHTNESS, COMPOSITION, PLAYER, ROTATION, WORLD } from "../config/config";
+import { BRIGHTNESS, COMPOSITION, CONTRAST, PLAYER, ROTATION, WORLD } from "../config/config";
 
 import { createScene } from "../scene/scene";
 import { createCamera } from "../scene/camera";
@@ -7,6 +7,7 @@ import { createRenderer } from "../scene/renderer";
 import { addLights } from "../scene/lights";
 import { createSky } from "../scene/sky";
 import { createAtmosphere } from "../scene/atmosphere";
+import { createPostProcess } from "../scene/postprocess";
 
 import { createTerrain } from "../world/terrain";
 import { createRocks } from "../world/rocks";
@@ -40,6 +41,7 @@ import { createHud } from "../ui/hud";
 import { createAlbumPlayerPanel } from "../ui/albumPlayerPanel";
 import { createBrightnessControl } from "../ui/brightnessControl";
 import { createCaptureControls } from "../ui/captureControls";
+import { createBrandFooter } from "../ui/brandFooter";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 
@@ -54,6 +56,15 @@ export function startExperience(container: HTMLElement): void {
   scene.add(camera);
   const lights = addLights(scene);
   scene.add(createSky());
+
+  /**
+   * --- Post-process pipeline ---
+   * Scene tonemapping + sRGB dönüşümü artık OutputPass tarafında yapılır
+   * (EffectComposer içinde). Böylece color grading pass'i linear uzayda
+   * çalışır ve son adımda ACES + sRGB uygulanır. `renderer.outputColorSpace`
+   * yine sRGB'dir (OutputPass bunu sonuca yazar).
+   */
+  const post = createPostProcess(renderer, scene, camera);
 
   const terrain = createTerrain();
   scene.add(terrain.mesh);
@@ -192,9 +203,14 @@ export function startExperience(container: HTMLElement): void {
    * `preserveDrawingBuffer: true` ile birleşince toDataURL'nin kararlı
    * bir PNG döndürmesini garantiler.
    */
-  createCaptureControls(container, {
+  const captureControls = createCaptureControls(container, {
     captureScreenshot: () => {
-      renderer.render(scene, camera);
+      /**
+       * Post-processed frame'i tazele — yakalamadan önce composer çalıştır
+       * ki grading + vignette dahil olsun. preserveDrawingBuffer: true
+       * nedeniyle toDataURL stabil sonuç döndürür.
+       */
+      post.composer.render();
       return renderer.domElement.toDataURL("image/png");
     },
     shareUrl: window.location.href,
@@ -204,6 +220,11 @@ export function startExperience(container: HTMLElement): void {
   });
   const interactionHint = createInteractionHint(container);
   const minimap = createMinimap(container);
+  /**
+   * Alt ortada duran minimal imza: "© 2026 · Powered by MeMoDe". Yalnızca
+   * DOM — sahneye hiçbir maliyeti yok, pointer-events: none.
+   */
+  createBrandFooter(container);
 
   /**
    * Plağın "yere düşme" konumunu oyuncunun önünde-ayağında hesaplar.
@@ -314,10 +335,24 @@ export function startExperience(container: HTMLElement): void {
     },
   });
 
-  /** Parlaklık değişimini doğrudan renderer exposure'a uygula. */
-  renderer.toneMappingExposure = brightness.exposure;
+  /**
+   * Parlaklık ve kontrast artık DOĞRUDAN post-process grading uniform'larına
+   * bağlanır; `renderer.toneMappingExposure` sabit 1.0'da tutulur. Bunun
+   * sebebi: figür ve "MÜKEMMEL BOŞLUK / REDD" yazıları alpha=0.25 marker'ı
+   * ile render edildiğinde grading shader onları tamamen atlar. Fakat
+   * renderer.toneMappingExposure material-level tonemap aşamasında etkili
+   * olduğu için slider'ı oraya bağlarsak yine de o pikselleri kaydırırdı.
+   *
+   * Slider yalnızca `uExposure` uniform'unu hareket ettirir → marker'lı
+   * pikseller parlaklık/kontrast slider'larına karşı sabit kalır.
+   */
+  renderer.toneMappingExposure = 1.0;
+  post.grading.exposure.value = brightness.exposure;
   brightness.onChange((exposure) => {
-    renderer.toneMappingExposure = Math.max(BRIGHTNESS.min, Math.min(BRIGHTNESS.max, exposure));
+    post.grading.exposure.value = Math.max(BRIGHTNESS.min, Math.min(BRIGHTNESS.max, exposure));
+  });
+  brightness.onContrastChange((contrast) => {
+    post.grading.contrast.value = Math.max(CONTRAST.min, Math.min(CONTRAST.max, contrast));
   });
 
   /**
@@ -326,6 +361,8 @@ export function startExperience(container: HTMLElement): void {
    *  - P  : albüm paneli aç/kapa
    *  - M  : harita aç/kapa
    *  - K  : kontroller paneli aç/kapa
+   *  - L  : parlaklık + kontrast paneli aç/kapa
+   *  - T  : ekran görüntüsü al (preview açılır)
    *
    * Not: E / Q interactionSystem içinde ayrıca dinlenir; burada onlara
    * dokunmuyoruz.
@@ -349,6 +386,16 @@ export function startExperience(container: HTMLElement): void {
         break;
       case "KeyK":
         hud.toggle();
+        break;
+      case "KeyL":
+        brightness.toggle();
+        break;
+      case "KeyT":
+        /**
+         * Ekran görüntüsü kısayolu — buton akışının birebir aynısı:
+         * composer taze render → toDataURL → preview modal.
+         */
+        captureControls.takeScreenshot();
         break;
     }
   };
@@ -391,6 +438,7 @@ export function startExperience(container: HTMLElement): void {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    post.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", resize);
 
@@ -513,7 +561,8 @@ export function startExperience(container: HTMLElement): void {
       })),
     );
 
-    renderer.render(scene, camera);
+    post.tick(time);
+    post.composer.render();
     requestAnimationFrame(animate);
   }
   animate();

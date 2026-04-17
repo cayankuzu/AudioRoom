@@ -1,13 +1,20 @@
 import * as THREE from "three";
 
+/**
+ * Gökyüzü — NÖTR, gri gradyan. Referans albüm kapağında sky neredeyse
+ * düz kırık-beyaz/gri; hafif bir vertical gradient var ama renk kayması
+ * yok. Bu shader'da mavi/sıcak tint KAPATILDI; yalnızca üç ton gri geçişi
+ * bulunur: zenit → horizon → ground haze.
+ */
 export function createSky(): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(460, 32, 16);
+  const geometry = new THREE.SphereGeometry(460, 48, 24);
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      topColor: { value: new THREE.Color("#e4e5e6") },
-      bottomColor: { value: new THREE.Color("#9d9fa0") },
+      zenithColor: { value: new THREE.Color("#cccfd2") },
+      horizonColor: { value: new THREE.Color("#b0b3b6") },
+      groundColor: { value: new THREE.Color("#8e9194") },
     },
     vertexShader: /* glsl */ `
       varying vec3 vWorldPosition;
@@ -19,12 +26,17 @@ export function createSky(): THREE.Mesh {
     `,
     fragmentShader: /* glsl */ `
       varying vec3 vWorldPosition;
-      uniform vec3 topColor;
-      uniform vec3 bottomColor;
+      uniform vec3 zenithColor;
+      uniform vec3 horizonColor;
+      uniform vec3 groundColor;
       void main() {
         float h = normalize(vWorldPosition).y;
-        float t = smoothstep(-0.1, 0.55, h);
-        gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
+        /** İki ayrı geçiş: altı → horizon, horizon → zenit. */
+        float tUp = smoothstep(0.0, 0.72, h);
+        float tGround = smoothstep(-0.35, 0.02, h);
+        vec3 color = mix(groundColor, horizonColor, tGround);
+        color = mix(color, zenithColor, tUp);
+        gl_FragColor = vec4(color, 1.0);
       }
     `,
   });

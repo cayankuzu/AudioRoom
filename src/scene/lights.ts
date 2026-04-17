@@ -18,10 +18,15 @@ export interface WorldLights {
   textFill: THREE.DirectionalLight;
   /** Yalnız TEXT layer'ında çalışan yumuşak boost — derinlik hissini artırır. */
   textBoost: THREE.PointLight;
+  /**
+   * Zeminde yan/grazing yönden hafifçe sürünen dolgu — zemin detayını
+   * yakalayıp "cinematic side light" hissini verir. Ana silueti bozmaz.
+   */
+  groundGraze: THREE.DirectionalLight;
 }
 
 /**
- * Işıklandırma felsefesi:
+ * Işıklandırma felsefesi (sinematik):
  *
  *  - `sun` (DirectionalLight) figürün TAM KAFA ARKASINDA. Görünmez; sadece
  *    backlight etkisi olarak hissedilir. Figür bu ışığın karşısında kalarak
@@ -33,39 +38,64 @@ export interface WorldLights {
  *
  *  - `fill` / `craterFill` / `hemi` / `ambient` sahnenin geneline çalışır;
  *    yer ve kayalar kapkara çamur olmaz, ama figürü yıkamaz.
+ *
+ *  - `groundGraze` çok zayıf ama yandan — toprak/kaya detaylarını yakalar,
+ *    foto-gerçekçi "sürünen yan ışık" hissi verir.
+ *
+ *  - Gölge PCFSoftShadow + büyük bias; siyahlar crush olmaz, detay kalır.
  */
 export function addLights(scene: THREE.Scene): WorldLights {
-  /** ---- Ana güneş (backlight, görünmez) ---- */
-  const sun = new THREE.DirectionalLight("#fff4d8", 2.4);
+  /**
+   * ---- Ana güneş (backlight, görünmez) ----
+   * Renk neredeyse nötr beyaz — kapak fotoğrafında arka ışık sıcak değil,
+   * bulutlu/dağılmış parlak bir gün ışığı hissi veriyor.
+   */
+  const sun = new THREE.DirectionalLight("#f5f3ee", 2.55);
   sun.position.set(-45, 52, -72);
   sun.target.position.set(0, 6, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 4.2;
-  sun.shadow.blurSamples = 14;
-  sun.shadow.camera.left = -85;
-  sun.shadow.camera.right = 85;
-  sun.shadow.camera.top = 85;
-  sun.shadow.camera.bottom = -85;
+  /**
+   * Daha geniş gölge blur yarıçapı + daha çok blur örneği → yumuşak,
+   * "soft" gerçekçi gölgeler. Küçük ayrıntıların üstüne bir aura oluşur.
+   */
+  sun.shadow.radius = 6.5;
+  sun.shadow.blurSamples = 20;
+  sun.shadow.camera.left = -95;
+  sun.shadow.camera.right = 95;
+  sun.shadow.camera.top = 95;
+  sun.shadow.camera.bottom = -95;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 280;
-  sun.shadow.bias = -0.0002;
-  sun.shadow.normalBias = 0.035;
+  sun.shadow.camera.far = 300;
+  /**
+   * Bias'i biraz daha negatif tutup normalBias'i büyütmek, yamaçta
+   * "shadow acne" olmadan yumuşak sızıntıyı önler.
+   */
+  sun.shadow.bias = -0.00018;
+  sun.shadow.normalBias = 0.055;
 
-  /** ---- Gökyüzü / yer dengesi ---- */
-  const hemi = new THREE.HemisphereLight("#d9dde2", "#2a241e", 0.62);
-  const ambient = new THREE.AmbientLight("#c6c8cc", 0.26);
+  /**
+   * ---- Gökyüzü / yer dengesi ----
+   * Monokrom referans — üst rengi de alt rengi de NÖTR gri. Referans
+   * fotoğraf: siyahlar derin AMA detay var, ön plan okunuyor. Bu yüzden
+   * hemi yoğunluğu artırıldı (0.68 → 0.95), ambient de biraz yukarı
+   * (0.24 → 0.42). Böylece siyahlar "crush" olmadan derin kalır.
+   */
+  const hemi = new THREE.HemisphereLight("#c8cbce", "#3a3b3d", 0.95);
+  const ambient = new THREE.AmbientLight("#bec1c4", 0.42);
 
   /**
    * Sahne genel fill — KAMERA tarafından GELEN bir directional. Figür'e
-   * doğrudan vurmasın diye zayıf tutulur ve hafif yukardan gelir.
+   * doğrudan vurmasın diye zayıf tutulur ve hafif yukardan gelir. Nötr
+   * açık gri — siyahlar gri olarak temiz açılır, mavi kayma yok.
    */
-  const fill = new THREE.DirectionalLight("#b8c3d4", 0.55);
+  const fill = new THREE.DirectionalLight("#b2b5b8", 0.72);
   fill.position.set(38, 36, 48);
   fill.target.position.set(0, 2, 0);
   fill.castShadow = false;
 
-  const craterFill = new THREE.PointLight("#a8b0bc", 0.85, 150, 1.6);
+  /** Krater içi dolgu — nötr gri; kraterin taban gölgelerini açık tutar. */
+  const craterFill = new THREE.PointLight("#a5a8ab", 0.95, 155, 1.6);
   craterFill.position.set(0, 4, 0);
   craterFill.castShadow = false;
 
@@ -91,6 +121,27 @@ export function addLights(scene: THREE.Scene): WorldLights {
   textBoost.castShadow = false;
   textBoost.layers.set(LAYER.TEXT);
 
+  /**
+   * ---- Ground grazing side-light ----
+   * Çok düşük yüksekten, yatay yönde gelen NÖTR dolgu. Amacı:
+   *   - Yan ışık altında zemin ve küçük kayaların normal map detaylarını
+   *     yakalamak (fotoğrafik "side lighting" etkisi).
+   *   - Düz ışıkta kaybolan mikro granül hissini öne çıkarmak.
+   *
+   * Renk nötr açık gri (mavi kayma yok), güç çok kısıtlı (≈0.32).
+   */
+  const groundGraze = new THREE.DirectionalLight("#b0b3b6", 0.32);
+  groundGraze.position.set(62, 4, 28);
+  groundGraze.target.position.set(0, 0.5, 0);
+  groundGraze.castShadow = false;
+
+  /**
+   * textFill + textBoost + textRim SAHNEYE EKLENMİYOR. figure.ts bunları
+   * `lightRig`'e (yani compositionGroup'un çocuğuna) ekleyecek. Bu sayede
+   * kompozisyon döndüğünde ışıklar da onunla birlikte döner → "MÜKEMMEL
+   * BOŞLUK" ve "REDD" yazıları her açıda aynı frontal aydınlatmayı alır,
+   * hiçbir zaman tamamen karanlıkta kalmaz.
+   */
   scene.add(
     sun,
     sun.target,
@@ -99,10 +150,18 @@ export function addLights(scene: THREE.Scene): WorldLights {
     fill,
     fill.target,
     craterFill,
+    groundGraze,
+    groundGraze.target,
+  );
+  return {
+    sun,
+    hemi,
+    ambient,
+    fill,
+    craterFill,
     textRim,
     textFill,
-    textFill.target,
     textBoost,
-  );
-  return { sun, hemi, ambient, fill, craterFill, textRim, textFill, textBoost };
+    groundGraze,
+  };
 }

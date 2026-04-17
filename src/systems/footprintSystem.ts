@@ -22,39 +22,59 @@ function createFootprintTexture(): THREE.Texture {
   }
   ctx.clearRect(0, 0, 192, 192);
 
-  /** Dış halo — açık kum bozunması (izin dış çeperi). */
-  const halo = ctx.createRadialGradient(96, 96, 14, 96, 96, 92);
-  halo.addColorStop(0, "rgba(228, 218, 196, 0.95)");
-  halo.addColorStop(0.45, "rgba(184, 172, 148, 0.78)");
+  /**
+   * Dış halo — açık kum bozunması (izin dış çeperi). Hafifçe daha
+   * "açık bej" tonuna kaydırıldı ki grading pass sonrası mavi kaymada
+   * kaybolmasın; siyah kumda net bir "kum havası" görünür.
+   */
+  const halo = ctx.createRadialGradient(96, 96, 12, 96, 96, 94);
+  halo.addColorStop(0, "rgba(236, 226, 202, 0.98)");
+  halo.addColorStop(0.45, "rgba(192, 180, 154, 0.82)");
   halo.addColorStop(0.85, "rgba(140, 128, 106, 0.18)");
   halo.addColorStop(1, "rgba(140, 128, 106, 0)");
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.ellipse(96, 96, 52, 86, 0, 0, Math.PI * 2);
+  ctx.ellipse(96, 96, 54, 88, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  /** İç gölge — topuk basıncı (kumda oluşan küçük çukur). */
-  const shadow = ctx.createRadialGradient(96, 118, 3, 96, 118, 34);
-  shadow.addColorStop(0, "rgba(14, 10, 8, 0.72)");
-  shadow.addColorStop(1, "rgba(14, 10, 8, 0)");
+  /**
+   * İç gölge — topuk basıncı (kumda oluşan küçük çukur). Daha koyu ve
+   * biraz daha geniş; grafikte "sand dent" hissi fotoğrafik olsun.
+   */
+  const shadow = ctx.createRadialGradient(96, 118, 2, 96, 118, 36);
+  shadow.addColorStop(0, "rgba(8, 6, 4, 0.82)");
+  shadow.addColorStop(0.5, "rgba(8, 6, 4, 0.42)");
+  shadow.addColorStop(1, "rgba(8, 6, 4, 0)");
   ctx.fillStyle = shadow;
   ctx.beginPath();
-  ctx.ellipse(96, 118, 27, 38, 0, 0, Math.PI * 2);
+  ctx.ellipse(96, 118, 28, 40, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  /** Topuğun arka tarafında ince bir "kum kenarı" kabartısı. */
+  const rimLight = ctx.createRadialGradient(96, 150, 1, 96, 150, 18);
+  rimLight.addColorStop(0, "rgba(240, 228, 204, 0.55)");
+  rimLight.addColorStop(1, "rgba(240, 228, 204, 0)");
+  ctx.fillStyle = rimLight;
+  ctx.beginPath();
+  ctx.ellipse(96, 150, 24, 10, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const dot = (cx: number, cy: number, r: number, a: number) => {
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(232, 220, 196, ${a})`);
-    g.addColorStop(1, "rgba(232, 220, 196, 0)");
+    g.addColorStop(0, `rgba(236, 224, 200, ${a})`);
+    g.addColorStop(1, "rgba(236, 224, 200, 0)");
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   };
   /** Parmak uçları — daha belirgin. */
-  dot(96, 40, 15, 0.92);
-  dot(76, 60, 10, 0.74);
-  dot(116, 60, 10, 0.74);
+  dot(96, 40, 15, 0.94);
+  dot(76, 60, 10, 0.76);
+  dot(116, 60, 10, 0.76);
+  /** Çok ince iki küçük ek nokta — parmak izi detayı. */
+  dot(62, 78, 6, 0.5);
+  dot(130, 78, 6, 0.5);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { SphereCollider } from "../types";
 import { PLAYER, WORLD } from "../config/config";
 import { mulberry32 } from "../utils/helpers";
+import { createRockMaps, shatterGeometry } from "./rockTextures";
 
 export interface RocksHandle {
   group: THREE.Group;
@@ -13,7 +14,12 @@ type ScatterZone = "outer" | "craterRim" | "craterFloor";
 /** Katman ayarı — hep aynı yapı, sadece parametreler değişir. */
 interface ScatterLayer {
   name: string;
-  geometry: THREE.BufferGeometry;
+  /**
+   * Geometri varyantları — aynı kaynak mesh'in farklı "kırık" halleri.
+   * İnstance başına rastgele seçilir, böylece tek bir IcosahedronGeometry
+   * tekrar ettiği belli olmaz.
+   */
+  variants: THREE.BufferGeometry[];
   material: THREE.MeshStandardMaterial;
   count: number;
   castShadow: boolean;
@@ -38,7 +44,27 @@ interface ScatterLayer {
   centerExclude: number;
   /** Büyük kayalar oyuncu ile çarpışır. */
   colliderFactor: number | null;
+  /** Katman bazlı renk jitter: instance-başına ton varyasyonu (±). */
+  colorJitter: number;
+  /**
+   * Yarı-gömülü oranı [0..1] — bu değere göre bir kısım kaya "embed"
+   * değerine EK bir çökme uygulanır; zeminle hard-cut izlenimi kırılır.
+   */
+  halfBuriedChance: number;
 }
+
+/**
+ * Volkanik kaya palet tabanı — 4 ton. Her instance, bu tabandan lerp +
+ * hafif HSL jitter alır. Düz siyah yığın yerine, gerçek lav parçası
+ * çeşitliliği hissi oluşur. Referans foto: koyu ama KATI değil; ışık
+ * altında gri highlight veren yüzeyler, gölgede hâlâ kül-siyahı.
+ */
+const ROCK_COLOR_BASE = [
+  new THREE.Color("#14151a"), // kömür
+  new THREE.Color("#1d1f25"), // koyu antrasit
+  new THREE.Color("#262830"), // füme
+  new THREE.Color("#30333a"), // rim-highlight (gri ton)
+].map((c) => c.clone());
 
 /**
  * Çok katmanlı kaya / taş / çakıl / toz instancing'i.
@@ -55,37 +81,91 @@ interface ScatterLayer {
  *
  * Tüm katmanlar InstancedMesh ile çizilir; büyükler için SphereCollider
  * çıkarılır, böylece oyuncu büyük kayaların içinden geçemez.
+ *
+ * GÖRSEL GELİŞMELER:
+ *  - Her katmanın birden fazla "shatter" geometri varyantı vardır; instance
+ *    başına rastgele biri seçilir → aynı mesh tekrarı fark edilmez.
+ *  - `MeshStandardMaterial` üstüne normal + roughness map paylaşımı eklenir.
+ *  - `setColorAt` ile per-instance renk jitter — ton çeşitliliği.
+ *  - Büyük/orta katmanlar için instance başına lokal scale farkı,
+ *    embed ve rotation zaten rastgele — buna "half-buried" payı eklenir.
  */
 export function createRocks(getHeightAt: (x: number, z: number) => number): RocksHandle {
   const group = new THREE.Group();
   const colliders: SphereCollider[] = [];
 
-  const matSharp = new THREE.MeshStandardMaterial({
-    color: "#0b0b0d",
-    roughness: 1,
-    metalness: 0,
-  });
-  const matSoft = new THREE.MeshStandardMaterial({
-    color: "#101012",
-    roughness: 0.98,
-    metalness: 0,
-  });
-  const matMid = new THREE.MeshStandardMaterial({
-    color: "#121215",
-    roughness: 0.96,
-    metalness: 0.01,
-  });
-  const matHero = new THREE.MeshStandardMaterial({
-    color: "#15151a",
-    roughness: 0.94,
-    metalness: 0.02,
-  });
+  /** Tek seferlik ortak detay haritaları (kanvas üretimli, ~512px). */
+  const { normalMap, roughnessMap } = createRockMaps(512);
 
-  /** Geometri varyasyonu — dodeca / icosa / farklı alt bölüm. */
-  const icoLow = new THREE.IcosahedronGeometry(1, 0);
-  const icoMid = new THREE.IcosahedronGeometry(1, 1);
-  const dodeca = new THREE.DodecahedronGeometry(1, 0);
-  const dodecaMid = new THREE.DodecahedronGeometry(1, 1);
+  /**
+   * Kategori bazlı materyaller — aynı normal/roughness'u paylaşır ama
+   * `map` yok (renk doğrudan vertex / instance color üzerinden gelir).
+   *
+   * `color` beyaz tutulur, böylece `setColorAt` ile verilen per-instance
+   * renk bire-bir görünür (MeshStandardMaterial shader'ı color * instColor
+   * şeklinde çarpar).
+   *
+   * `normalScale` normal map gücü. Büyük kayalar için daha yüksek tutulur —
+   * anıtsal parçalar detaylı görünsün. Küçük çakıl için düşük — aşırı
+   * gürültü olmasın.
+   */
+  function rockMat(params: {
+    normalStrength: number;
+    roughness: number;
+    metalness: number;
+  }): THREE.MeshStandardMaterial {
+    return new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      roughness: params.roughness,
+      metalness: params.metalness,
+      normalMap,
+      normalScale: new THREE.Vector2(params.normalStrength, params.normalStrength),
+      roughnessMap,
+    });
+  }
+
+  const matHero = rockMat({ normalStrength: 1.35, roughness: 0.94, metalness: 0.03 });
+  const matMid = rockMat({ normalStrength: 1.1, roughness: 0.96, metalness: 0.02 });
+  const matSoft = rockMat({ normalStrength: 0.85, roughness: 0.98, metalness: 0 });
+  const matSharp = rockMat({ normalStrength: 0.75, roughness: 1.0, metalness: 0 });
+
+  /**
+   * ---- Shatter geometry varyantları ----
+   * Her kaynak mesh için birkaç farklı "kırık" üretilir. Instance dağılım
+   * sırasında rastgele biri seçildiği için, aynı parçanın tekrarlandığı
+   * anlaşılmaz.
+   */
+  const icoLowSrc = new THREE.IcosahedronGeometry(1, 0);
+  const icoMidSrc = new THREE.IcosahedronGeometry(1, 1);
+  const dodecaSrc = new THREE.DodecahedronGeometry(1, 0);
+  const dodecaMidSrc = new THREE.DodecahedronGeometry(1, 1);
+
+  /** Küçük yardımcı: kaynak mesh'ten N varyant üret. */
+  function variants(
+    src: THREE.BufferGeometry,
+    n: number,
+    seedBase: number,
+    strength: number,
+    cuts: number,
+  ): THREE.BufferGeometry[] {
+    const out: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < n; i += 1) {
+      out.push(shatterGeometry(src, seedBase + i * 1741, strength, cuts));
+    }
+    return out;
+  }
+
+  /** Kaynak geometrileri serbest bırakmak için takip et (dispose). */
+  const sources = [icoLowSrc, icoMidSrc, dodecaSrc, dodecaMidSrc];
+
+  const heroVariants = variants(dodecaMidSrc, 5, 1001, 0.9, 3);
+  const boulderVariants = variants(dodecaSrc, 5, 2001, 0.75, 2);
+  const mediumVariants = variants(icoMidSrc, 5, 3001, 0.6, 2);
+  const cobbleVariants = variants(icoMidSrc, 4, 4001, 0.5, 2);
+  const smallVariants = variants(icoLowSrc, 4, 5001, 0.55, 2);
+  const gravelVariants = variants(icoLowSrc, 3, 6001, 0.45, 1);
+  const pebbleVariants = variants(icoLowSrc, 3, 7001, 0.4, 1);
+  const microVariants = variants(icoLowSrc, 2, 8001, 0.35, 1);
 
   const craterExclBase = WORLD.craterRimRadius + 4;
   /** Kompozisyon merkezi yakını — figür + yazı için boş bırakılır. */
@@ -94,7 +174,7 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
   const layers: ScatterLayer[] = [
     {
       name: "hero",
-      geometry: dodecaMid,
+      variants: heroVariants,
       material: matHero,
       count: 24,
       castShadow: true,
@@ -110,10 +190,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 5.5,
       centerExclude: craterExclBase + 8,
       colliderFactor: 0.95,
+      colorJitter: 0.18,
+      halfBuriedChance: 0.25,
     },
     {
       name: "boulder",
-      geometry: dodeca,
+      variants: boulderVariants,
       material: matHero,
       count: 160,
       castShadow: true,
@@ -129,10 +211,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 3.8,
       centerExclude: craterExclBase + 2,
       colliderFactor: 0.9,
+      colorJitter: 0.2,
+      halfBuriedChance: 0.3,
     },
     {
       name: "medium",
-      geometry: icoMid,
+      variants: mediumVariants,
       material: matMid,
       count: 520,
       castShadow: true,
@@ -148,10 +232,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 2.8,
       centerExclude: craterExclBase,
       colliderFactor: 0.8,
+      colorJitter: 0.22,
+      halfBuriedChance: 0.35,
     },
     {
       name: "cobble",
-      geometry: icoMid,
+      variants: cobbleVariants,
       material: matSoft,
       count: 1120,
       castShadow: true,
@@ -167,10 +253,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 2.2,
       centerExclude: craterExclBase - 1,
       colliderFactor: null,
+      colorJitter: 0.24,
+      halfBuriedChance: 0.45,
     },
     {
       name: "small",
-      geometry: icoLow,
+      variants: smallVariants,
       material: matSharp,
       count: 1900,
       castShadow: true,
@@ -186,10 +274,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.8,
       centerExclude: craterExclBase - 3,
       colliderFactor: null,
+      colorJitter: 0.28,
+      halfBuriedChance: 0.5,
     },
     {
       name: "gravel",
-      geometry: icoLow,
+      variants: gravelVariants,
       material: matSoft,
       count: 3400,
       castShadow: false,
@@ -205,10 +295,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.4,
       centerExclude: craterExclBase - 6,
       colliderFactor: null,
+      colorJitter: 0.3,
+      halfBuriedChance: 0.55,
     },
     {
       name: "pebble",
-      geometry: icoLow,
+      variants: pebbleVariants,
       material: matSharp,
       count: 4000,
       castShadow: false,
@@ -224,10 +316,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.0,
       centerExclude: craterExclBase - 8,
       colliderFactor: null,
+      colorJitter: 0.34,
+      halfBuriedChance: 0.6,
     },
     {
       name: "micro",
-      geometry: icoLow,
+      variants: microVariants,
       material: matSharp,
       count: 4600,
       castShadow: false,
@@ -243,11 +337,13 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 0.8,
       centerExclude: craterExclBase - 10,
       colliderFactor: null,
+      colorJitter: 0.32,
+      halfBuriedChance: 0.65,
     },
     /** -------- Krater bölgesi katmanları -------- */
     {
       name: "craterRimBoulder",
-      geometry: dodeca,
+      variants: boulderVariants,
       material: matHero,
       count: 42,
       castShadow: true,
@@ -263,10 +359,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 3.2,
       centerExclude: compositionClear + 4,
       colliderFactor: 0.9,
+      colorJitter: 0.2,
+      halfBuriedChance: 0.35,
     },
     {
       name: "craterRimMedium",
-      geometry: icoMid,
+      variants: mediumVariants,
       material: matMid,
       count: 130,
       castShadow: true,
@@ -282,10 +380,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 2.4,
       centerExclude: compositionClear + 2,
       colliderFactor: 0.8,
+      colorJitter: 0.22,
+      halfBuriedChance: 0.4,
     },
     {
       name: "craterFloorMedium",
-      geometry: icoMid,
+      variants: mediumVariants,
       material: matMid,
       count: 95,
       castShadow: true,
@@ -301,10 +401,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 2.0,
       centerExclude: compositionClear,
       colliderFactor: 0.78,
+      colorJitter: 0.22,
+      halfBuriedChance: 0.4,
     },
     {
       name: "craterCobble",
-      geometry: icoMid,
+      variants: cobbleVariants,
       material: matSoft,
       count: 320,
       castShadow: true,
@@ -320,10 +422,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.8,
       centerExclude: compositionClear - 2,
       colliderFactor: null,
+      colorJitter: 0.26,
+      halfBuriedChance: 0.45,
     },
     {
       name: "craterGravel",
-      geometry: icoLow,
+      variants: gravelVariants,
       material: matSoft,
       count: 820,
       castShadow: false,
@@ -339,10 +443,12 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.4,
       centerExclude: compositionClear - 4,
       colliderFactor: null,
+      colorJitter: 0.3,
+      halfBuriedChance: 0.55,
     },
     {
       name: "craterPebble",
-      geometry: icoLow,
+      variants: pebbleVariants,
       material: matSharp,
       count: 1200,
       castShadow: false,
@@ -358,6 +464,8 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
       clusterRadius: 1.0,
       centerExclude: compositionClear - 5,
       colliderFactor: null,
+      colorJitter: 0.32,
+      halfBuriedChance: 0.6,
     },
   ];
 
@@ -367,6 +475,7 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
   const quat = new THREE.Quaternion();
   const scl = new THREE.Vector3();
   const eul = new THREE.Euler();
+  const tmpColor = new THREE.Color();
 
   const playerStart = new THREE.Vector2(PLAYER.startPosition.x, PLAYER.startPosition.z);
   const foregroundDir = playerStart.clone().normalize();
@@ -504,41 +613,106 @@ export function createRocks(getHeightAt: (x: number, z: number) => number): Rock
     return { x: Math.cos(angle) * base, z: Math.sin(angle) * base };
   }
 
+  /**
+   * Katman başına her geometri varyantı için AYRI InstancedMesh açılır.
+   * Böylece hem InstancedMesh'in count'u optimize kalır, hem de her
+   * parçanın farklı "shatter" silüeti sahneye dağılır.
+   *
+   * Toplam instance sayısı = layer.count (değişmedi).
+   */
   for (const layer of layers) {
-    const mesh = new THREE.InstancedMesh(layer.geometry, layer.material, layer.count);
-    mesh.castShadow = layer.castShadow;
-    mesh.receiveShadow = true;
-    mesh.name = `rocks:${layer.name}`;
-
-    for (let i = 0; i < layer.count; i += 1) {
-      const { x, z } = sampleInLayer(layer);
-      const y = getHeightAt(x, z);
-      const embed = layer.embedMin + rand() * (layer.embedMax - layer.embedMin);
-      pos.set(x, y - embed, z);
-
-      eul.set((rand() - 0.5) * 0.6, rand() * Math.PI * 2, (rand() - 0.5) * 0.6);
-      quat.setFromEuler(eul);
-
-      const base = layer.scaleMin + rand() * (layer.scaleMax - layer.scaleMin);
-      const sx = base;
-      const sy = base * (layer.squashMin + rand() * (layer.squashMax - layer.squashMin));
-      const sz = base * (layer.squashMin + rand() * (layer.squashMax - layer.squashMin));
-      scl.set(sx, sy, sz);
-
-      mat.compose(pos, quat, scl);
-      mesh.setMatrixAt(i, mat);
-
-      if (layer.colliderFactor !== null && base > 0.45) {
-        colliders.push({
-          center: new THREE.Vector3(x, y, z),
-          radius: base * layer.colliderFactor,
-        });
-      }
+    /** Instance'ları önce varyantlara böl — katmanın toplam sayısı sabit. */
+    const perVariant: { geo: THREE.BufferGeometry; count: number }[] = [];
+    const vCount = layer.variants.length;
+    const basePer = Math.floor(layer.count / vCount);
+    let assigned = 0;
+    for (let v = 0; v < vCount; v += 1) {
+      const c = v === vCount - 1 ? layer.count - assigned : basePer;
+      assigned += c;
+      perVariant.push({ geo: layer.variants[v], count: c });
     }
 
-    mesh.instanceMatrix.needsUpdate = true;
-    group.add(mesh);
+    for (let vi = 0; vi < perVariant.length; vi += 1) {
+      const pv = perVariant[vi];
+      if (pv.count <= 0) continue;
+
+      const mesh = new THREE.InstancedMesh(pv.geo, layer.material, pv.count);
+      mesh.castShadow = layer.castShadow;
+      mesh.receiveShadow = true;
+      mesh.name = `rocks:${layer.name}`;
+
+      for (let i = 0; i < pv.count; i += 1) {
+        const { x, z } = sampleInLayer(layer);
+        const y = getHeightAt(x, z);
+        let embed = layer.embedMin + rand() * (layer.embedMax - layer.embedMin);
+        /**
+         * Yarı-gömülü: zeminle hard-cut görünmesin — yüzeyin içine ek
+         * bir çökme payı uygulanır (en büyük kayalar için dahi %25+).
+         */
+        if (rand() < layer.halfBuriedChance) {
+          const scaleHint = layer.scaleMin + (layer.scaleMax - layer.scaleMin) * 0.5;
+          embed += scaleHint * (0.25 + rand() * 0.45);
+        }
+        pos.set(x, y - embed, z);
+
+        /** Random yaw + küçük pitch/roll — aynı mesh dönüşü tekrar etmesin. */
+        eul.set(
+          (rand() - 0.5) * 0.85,
+          rand() * Math.PI * 2,
+          (rand() - 0.5) * 0.85,
+        );
+        quat.setFromEuler(eul);
+
+        const base = layer.scaleMin + rand() * (layer.scaleMax - layer.scaleMin);
+        const sx = base * (0.92 + rand() * 0.18);
+        const sy = base * (layer.squashMin + rand() * (layer.squashMax - layer.squashMin));
+        const sz = base * (layer.squashMin + rand() * (layer.squashMax - layer.squashMin));
+        scl.set(sx, sy, sz);
+
+        mat.compose(pos, quat, scl);
+        mesh.setMatrixAt(i, mat);
+
+        /**
+         * Per-instance renk: base palettten iki ton arasında lerp + HSL
+         * jitter. Sonuç: yığınık kayalar tek tek biraz farklı renktedir,
+         * ışık altında "aynı malzeme" izlenimi kaybolur.
+         */
+        const aIdx = Math.floor(rand() * ROCK_COLOR_BASE.length);
+        let bIdx = Math.floor(rand() * ROCK_COLOR_BASE.length);
+        if (bIdx === aIdx) bIdx = (aIdx + 1) % ROCK_COLOR_BASE.length;
+        tmpColor.copy(ROCK_COLOR_BASE[aIdx]).lerp(ROCK_COLOR_BASE[bIdx], rand());
+        /** HSL çok hafif shift — saturation düşük, value içinde oyna. */
+        const jit = layer.colorJitter;
+        const hsl = { h: 0, s: 0, l: 0 };
+        tmpColor.getHSL(hsl);
+        hsl.h = (hsl.h + (rand() - 0.5) * 0.04 + 1) % 1;
+        hsl.s = THREE.MathUtils.clamp(hsl.s + (rand() - 0.5) * 0.08, 0, 0.2);
+        /**
+         * Lightness aralığı biraz yukarı kaydırıldı (0.05..0.32) → hâlâ
+         * koyu volkanik, ama kayaların bir kısmında net bir gri highlight
+         * olabilir. Böylece yığın "katı siyah duvar" yerine çeşitli tonlu
+         * gerçek kayalar gibi okunur.
+         */
+        hsl.l = THREE.MathUtils.clamp(hsl.l + (rand() - 0.5) * jit, 0.05, 0.32);
+        tmpColor.setHSL(hsl.h, hsl.s, hsl.l);
+        mesh.setColorAt(i, tmpColor);
+
+        if (layer.colliderFactor !== null && base > 0.45) {
+          colliders.push({
+            center: new THREE.Vector3(x, y, z),
+            radius: base * layer.colliderFactor,
+          });
+        }
+      }
+
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      group.add(mesh);
+    }
   }
+
+  /** Kaynak geometrileri (varyantlara kopyalandı, dispose güvenli). */
+  for (const s of sources) s.dispose();
 
   return { group, colliders };
 }

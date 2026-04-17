@@ -923,6 +923,55 @@ body {
 }
 
 /* ========================
+   Brand footer — ALT ORTA.
+   Sahne atmosferini bozmayacak kadar minimal; düşük opaklık ve ince
+   tipografi. pointer-events: none → oyun etkileşimini asla engellemez.
+   ======================== */
+.brand-footer {
+  position: absolute;
+  left: 50%;
+  bottom: 0.55rem;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(235, 235, 240, 0.42);
+  background: rgba(8, 8, 10, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.brand-footer__copy {
+  font-weight: 500;
+  color: rgba(235, 235, 240, 0.5);
+}
+
+.brand-footer__sep {
+  opacity: 0.35;
+}
+
+.brand-footer__by {
+  font-weight: 400;
+}
+
+.brand-footer__by strong {
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: rgba(245, 220, 170, 0.78);
+  margin-left: 0.25rem;
+}
+
+/* ========================
    Minimap — SOL ALT KÖŞE.
    Kapatılınca yalnız ince header bar kalır (Harita · +).
    ======================== */
@@ -1041,6 +1090,14 @@ body {
   transition: min-width 180ms ease, padding 180ms ease;
 }
 
+.bright-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 14px;
+}
+
 .bright-panel__toggle {
   display: inline-flex;
   align-items: center;
@@ -1054,10 +1111,62 @@ body {
   letter-spacing: 0.22em;
   text-transform: uppercase;
   font-size: 0.64rem;
+  flex: 1 1 auto;
+  text-align: left;
 }
 
 .bright-panel__toggle:hover {
   color: #fff;
+}
+
+/* ---- Reset "Varsayılan" butonu ---- */
+.bright-panel__reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d6d6d6;
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem 0.18rem 0.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.bright-panel__reset[hidden] {
+  display: none;
+}
+
+.bright-panel__reset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.bright-panel__reset:active {
+  transform: scale(0.96);
+}
+
+.bright-panel__reset svg {
+  flex: 0 0 auto;
+}
+
+.bright-panel__reset-label {
+  line-height: 1;
+}
+
+/**
+ * Panel kapalıyken bile reset butonu görünür kalır — "değerleriniz default
+ * değil" sinyali her zaman erişilebilir olsun.
+ */
+.bright-panel--collapsed .bright-panel__reset {
+  font-size: 0.54rem;
+  padding: 0.14rem 0.38rem 0.14rem 0.34rem;
 }
 
 .bright-panel__toggle-dot {
@@ -1071,8 +1180,11 @@ body {
 
 .bright-panel__body {
   overflow: hidden;
-  max-height: 60px;
+  max-height: 140px;
   opacity: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
   transition: max-height 180ms ease, opacity 180ms ease;
 }
 
@@ -1087,19 +1199,28 @@ body {
   pointer-events: none;
 }
 
+/**
+ * Panel kapandığında yükseklik ~32px'e düşer; capture-panel'i de
+ * yukarı çekerek aradaki boşluğu kapat.
+ */
+.bright-panel--collapsed ~ .capture-panel {
+  top: calc(1rem + 46px);
+}
+
 .bright-panel__label {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.55rem;
   cursor: pointer;
 }
 
 .bright-panel__kicker {
-  font-size: 0.64rem;
-  letter-spacing: 0.22em;
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #b9b9b9;
+  color: #9b9b9b;
+  min-width: 5.5ch;
 }
 
 .bright-panel__slider {
@@ -1121,9 +1242,10 @@ body {
    ======================== */
 .capture-panel {
   position: absolute;
-  /* Parlaklık paneli yaklaşık top:1rem + 60-80px; onun altına denk gelir. */
-  top: calc(1rem + 86px);
+  /* Parlaklık + kontrast paneli açıkken ~150px; onun altına denk gelir. */
+  top: calc(1rem + 150px);
   right: 1rem;
+  transition: top 180ms ease;
   z-index: 6;
   display: grid;
   grid-template-columns: 1fr;
@@ -1351,9 +1473,13 @@ body {
   }
 
   .capture-panel {
-    top: calc(0.6rem + 78px);
+    top: calc(0.6rem + 138px);
     right: 0.6rem;
     min-width: 170px;
+  }
+
+  .bright-panel--collapsed ~ .capture-panel {
+    top: calc(0.6rem + 42px);
   }
 
   .landing {
@@ -1371,5 +1497,12 @@ body {
   .hud {
     font-size: 0.72rem;
     min-width: 170px;
+  }
+  .brand-footer {
+    font-size: 0.58rem;
+    padding: 0.18rem 0.55rem;
+    letter-spacing: 0.14em;
+    gap: 0.32rem;
+    bottom: 0.4rem;
   }
 }

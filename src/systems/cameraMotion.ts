@@ -114,6 +114,21 @@ export function createCameraMotion(): CameraMotion {
       camera.position.x += Math.sin(pose.yaw + Math.PI / 2) * lateral + windSwayX;
       camera.position.z += Math.cos(pose.yaw + Math.PI / 2) * lateral;
 
+      /**
+       * Organik mikro-pitch/yaw drift — kamera hiç sabit durmasın. Hem
+       * yürüyüşte hem idle'da yaşayan, çok küçük bir "nefes/kafa tutma"
+       * salınımı. Fotoğrafik "el kamerası" hissi verir ama mide
+       * bulandırmaz (0.08° civarı).
+       */
+      const microPitch =
+        Math.sin(time * 0.31) * 0.0006 +
+        Math.sin(time * 0.9 + 1.2) * 0.00035 * (0.4 + s.idleLevel * 0.6);
+      const microYaw =
+        Math.sin(time * 0.21 + 0.6) * 0.00055 +
+        Math.cos(time * 0.77) * 0.00028 * (0.4 + s.idleLevel * 0.6);
+      camera.rotation.x += microPitch;
+      camera.rotation.y += microYaw;
+
       /** FOV dinamikleri — sprint hafif açar, crouch hafif kapar. */
       let targetFov = CAMERA.fov;
       if (pose.sprinting && pose.speed > PLAYER.walkSpeed + 0.4) {

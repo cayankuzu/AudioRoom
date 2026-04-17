@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { COMPOSITION, PLAYER, WORLD } from "../config/config";
 import type { WorldLights } from "../scene/lights";
 import { LAYER } from "../scene/layers";
+import { applyFixedColorMarker } from "../utils/fixedColorMarker";
 
 export interface FigureHandle {
   root: THREE.Group;
@@ -27,13 +28,25 @@ const NIGHT_FOG = new THREE.Color("#1a1e24");
  * - Emissive yok — sahne ışığına tepkisiz görünsün, silüet baskın kalsın.
  */
 function buildFigureMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color: "#030305",
-    roughness: 0.98,
-    metalness: 0.03,
+  const mat = new THREE.MeshStandardMaterial({
+    /**
+     * Saf siyah silüet — albüm kapağındaki gibi. Hiçbir gri kayma
+     * istemiyoruz; grading'in red-mask kuralı sayesinde bu pikseller
+     * zaten monokrom kanada düşüyor, hafif hemi dolgu silüetin kenarlarına
+     * minik bir detay bırakıyor.
+     */
+    color: "#000000",
+    roughness: 1.0,
+    metalness: 0,
     emissive: "#000000",
     emissiveIntensity: 0,
   });
+  /**
+   * Parlaklık/kontrast slider'ları figürü değiştirmesin — post-process
+   * grading bu pikselleri alpha marker üzerinden tamamen atlar.
+   */
+  applyFixedColorMarker(mat);
+  return mat;
 }
 
 function buildFallbackFigure(mat: THREE.MeshStandardMaterial): THREE.Group {
@@ -131,34 +144,64 @@ export function createFigure(
    * Horizon glow ihtiyacı olursa fog + hemi dengesi yeterli.
    */
 
-  /** Fill / crater / textRim — sahne seviyesinde sabit. */
+  /** Fill / crater — sahne seviyesinde sabit. */
   const textBaseY = craterFloorY + COMPOSITION.baseLift;
 
   /**
-   * textFill + textBoost dünya uzayında kalır — composition rotasyonu
-   * figür silüetini istenilen şekilde dönderir, ancak yazıların yüzüne
-   * vuran ışık viewer tarafından stabil gelir → okunurluk korunur.
+   * ---- KOMPOZİSYON-LOCAL TEXT AYDINLATMASI ----
+   *
+   * `textFill`, `textBoost` ve `textRim` artık `lightRig`'e (yani
+   * compositionGroup'un çocuğuna) parentlanır. Local koordinatlar
+   * figürün/yazıların önünde (viewerDir yönünde) konumlandırılır, target
+   * yazıların tam merkezine bakar.
+   *
+   * Kompozisyon döndüğünde ışıklar da onunla birlikte döner; text'in
+   * yüzüne vuran frontal-fill açısı her rotasyonda SABİT kalır →
+   * "MÜKEMMEL BOŞLUK" ve "REDD" hiçbir rotasyonda karanlığa düşmez.
+   *
+   * Local frame: composition world pos (0, compositionBaseY, 0) etrafında
+   * döner; yazılar local (0, titleExtraY, 0) ve (0, artistExtraY, 0)'da
+   * duruyor. Local Y'ler hesabı için figür pivot lift'ini temel alıyoruz.
    */
-  const worldTextY = textBaseY + COMPOSITION.titleExtraY;
+  const localTitleY = COMPOSITION.titleExtraY;
+  const localArtistY = COMPOSITION.artistExtraY;
+  /** Orta Y — textFill ikisini de yalayacak şekilde. */
+  const localTextMidY = (localTitleY + localArtistY) * 0.5;
+
+  /**
+   * textFill — yazının ÖNÜNDE (viewerDir yönünde), hafif yukardan iniyor.
+   * Figür siluetinin karşı tarafında kalarak yazıya frontal ışık verir.
+   * Composition çocuğu olduğu için composition rotasyonu ile döner.
+   */
   lights.textFill.position.set(
     viewerDir.x * 26,
-    worldTextY + 8,
+    localTextMidY + 8,
     viewerDir.y * 26,
   );
-  lights.textFill.target.position.set(WORLD.craterCenter.x, worldTextY, WORLD.craterCenter.z);
+  lights.textFill.target.position.set(0, localTextMidY, 0);
+  lightRig.add(lights.textFill);
+  lightRig.add(lights.textFill.target);
+
+  /** textBoost — yazıya çok yakın, kısa menzilli okunurluk garantisi. */
   lights.textBoost.position.set(
-    WORLD.craterCenter.x + viewerDir.x * 4,
-    worldTextY + 1.2,
-    WORLD.craterCenter.z + viewerDir.y * 4,
+    viewerDir.x * 4,
+    localTextMidY + 1.2,
+    viewerDir.y * 4,
   );
+  lightRig.add(lights.textBoost);
+
+  /** textRim — yazıya yandan vurup kenar parlamasını öne çıkarır. */
+  lights.textRim.position.set(
+    viewerDir.x * 5.5,
+    localTextMidY + 2.0,
+    viewerDir.y * 5.5,
+  );
+  lightRig.add(lights.textRim);
+
+  /** fill / craterFill — sahne seviyesinde sabit (composition dışı). */
   lights.fill.position.set(viewerDir.x * 20, 32, viewerDir.y * 20 + 14);
   lights.fill.target.position.set(WORLD.craterCenter.x, textBaseY + 2.5, WORLD.craterCenter.z);
   lights.craterFill.position.set(WORLD.craterCenter.x, craterFloorY + 11, WORLD.craterCenter.z);
-  lights.textRim.position.set(
-    WORLD.craterCenter.x + viewerDir.x * 5.5,
-    textBaseY + 5.5,
-    WORLD.craterCenter.z + viewerDir.y * 5.5,
-  );
 
   const sunWorld = new THREE.Vector3();
   const targetWorld = new THREE.Vector3();
@@ -188,19 +231,29 @@ export function createFigure(
         /** Figür TEXT layer'ında DEĞİL — textFill ve textBoost onu etkilemez. */
         mesh.layers.set(LAYER.DEFAULT);
         const tint = (material: THREE.MeshStandardMaterial) => {
-          /** Silüet: orijinal texture varsa hafif koyult; yoksa düz koyu. */
-          if (material.map) {
-            material.color = new THREE.Color("#2a2a2c");
-          } else {
-            material.color = new THREE.Color("#0a0a0c");
-          }
-          material.roughness = 0.95;
-          material.metalness = 0.04;
+          /**
+           * SAF SİYAH SİLÜET — GLB texture'ı olsa bile onu iptal ediyoruz
+           * (map/roughness/metal/normal/emissive null'lanır). Albüm kapak
+           * referansına göre figür ton farkı olmayan düz siyah bir form;
+           * yalnızca hemi + fill ışık kenarlarında çok hafif bir nüans
+           * bırakır, içi ölü siyah kalır.
+           */
+          material.map = null;
+          material.normalMap = null;
+          material.roughnessMap = null;
+          material.metalnessMap = null;
+          material.emissiveMap = null;
+          material.aoMap = null;
+          material.color = new THREE.Color("#000000");
+          material.roughness = 1.0;
+          material.metalness = 0;
           material.emissive = new THREE.Color("#000000");
           material.emissiveIntensity = 0;
           material.transparent = false;
           material.depthWrite = true;
           material.side = THREE.FrontSide;
+          /** Parlaklık/kontrast slider'ından bağımsız sabit silüet. */
+          applyFixedColorMarker(material);
           material.needsUpdate = true;
         };
         const m = mesh.material as

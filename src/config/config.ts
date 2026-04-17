@@ -106,12 +106,33 @@ export const FLASHLIGHT = {
   targetForward: 14,
 } as const;
 
-/** Sağ üst UI — sahne genel parlaklığı (exposure). */
+/**
+ * Sağ üst UI — sahne genel parlaklığı (exposure).
+ *
+ * Varsayılan 1.0 = nötr ACES tonemapping. Albüm kapağındaki "kapalı ama
+ * detaylı" his için önerilen aralık 0.95–1.10; kullanıcı yine de kendi
+ * ekranına göre ayarlayabilir.
+ */
 export const BRIGHTNESS = {
   min: 0.45,
   max: 2.1,
-  default: 1.18,
+  default: 0.61,
   step: 0.02,
+} as const;
+
+/**
+ * Parlaklık panelinin altında çıkan kontrast slider'ı. Post-process
+ * `ColorGradingShader.uContrast` uniform'una doğrudan bağlanır; yumuşak
+ * S-curve denklemine göre 1.0 = dokunulmamış, <1 yumuşatır, >1 sertleştirir.
+ *
+ * Varsayılan 1.08 → kapak fotoğrafındaki "derin siyah + temiz ton geçişi"
+ * hissine uyan hafif S-curve. Yazıları siyah, REDD'i koyu-kırmızı tutar.
+ */
+export const CONTRAST = {
+  min: 0.8,
+  max: 1.35,
+  default: 1.01,
+  step: 0.01,
 } as const;
 
 /**

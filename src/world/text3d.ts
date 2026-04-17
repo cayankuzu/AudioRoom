@@ -4,6 +4,7 @@ import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import type { SphereCollider } from "../types";
 import { COMPOSITION, WORLD } from "../config/config";
 import { patchTurkishGlyphs } from "../utils/fontPatcher";
+import { applyFixedColorMarker } from "../utils/fixedColorMarker";
 import { LAYER } from "../scene/layers";
 
 export interface Text3DHandle {
@@ -51,12 +52,16 @@ const TITLE_STYLE: TextStyle = {
   curveSegments: 10,
   /** Kapaktaki uzatılmış geniş aralık. */
   letterSpacing: 0.55,
-  /** SİYAH başlık — "MÜKEMMEL BOŞLUK". Bevel + ışık silüeti koruyor. */
-  color: "#060608",
+  /**
+   * SAF SİYAH başlık — "MÜKEMMEL BOŞLUK". Albüm kapağındaki gibi hiçbir
+   * gri kayma istemiyoruz. Roughness 1.0 + metalness 0 → spekular ışık
+   * yok, yalnızca difüz gölge; bevel hâlâ hafif kenar nüansı veriyor.
+   */
+  color: "#000000",
   emissive: "#000000",
   emissiveIntensity: 0,
-  roughness: 0.58,
-  metalness: 0.1,
+  roughness: 1.0,
+  metalness: 0,
 };
 
 const BAND_STYLE: TextStyle = {
@@ -68,11 +73,24 @@ const BAND_STYLE: TextStyle = {
   bevelSegments: 2,
   curveSegments: 10,
   letterSpacing: 0.78,
-  color: "#c41018",
-  emissive: "#7a0a10",
-  emissiveIntensity: 0.28,
-  roughness: 0.5,
-  metalness: 0.06,
+  /**
+   * "REDD" — PARLAK koyu kırmızı. Marker sayesinde post-process
+   * parlaklık/kontrast slider'larından etkilenmiyor; bu yüzden son
+   * görünüşü bu renklerden oluşuyor:
+   *
+   *  - `color` daha canlı bir kan kırmızısı (#9e0e18) → ışık altında
+   *    rendered değer ortalama 0.20–0.35 bandında kalır, siyah gözükmez.
+   *  - `emissive` + yüksek intensity → sahne ışığından BAĞIMSIZ taban
+   *    parlaklığı. Kompozisyon döndüğünde de karanlığa düşmez; fakat
+   *    kırmızı dominant olduğu için grading'in redMask alanındadır,
+   *    renk kaymaz.
+   *  - Roughness düşürüldü → minimal spekular ama belirgin kenar ışığı.
+   */
+  color: "#9e0e18",
+  emissive: "#5a0810",
+  emissiveIntensity: 0.55,
+  roughness: 0.62,
+  metalness: 0,
 };
 
 /**
@@ -93,6 +111,11 @@ function buildTextMesh(text: string, font: Font, style: TextStyle): THREE.Mesh {
     metalness: style.metalness,
     side: THREE.FrontSide,
   });
+  /**
+   * Parlaklık/kontrast slider'ları yazıyı KAYDIRMAMALI. Materyal
+   * post-process grading pass'inde alpha marker ile atlanır.
+   */
+  applyFixedColorMarker(material);
 
   let cursor = 0;
   const chars = Array.from(text);

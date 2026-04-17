@@ -29,6 +29,8 @@ export function createHud(parent: HTMLElement): Hud {
       <div class="hud__row"><span>P</span><em>Albüm paneli</em></div>
       <div class="hud__row"><span>M</span><em>Harita</em></div>
       <div class="hud__row"><span>K</span><em>Kontroller</em></div>
+      <div class="hud__row"><span>L</span><em>Parlaklık · Kontrast</em></div>
+      <div class="hud__row"><span>T</span><em>Ekran görüntüsü</em></div>
       <div class="hud__divider"></div>
       <div class="hud__row hud__row--hint"><span>ESC</span><em>İmleci serbest bırak</em></div>
     </div>
