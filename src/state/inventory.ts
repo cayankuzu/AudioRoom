@@ -44,14 +44,17 @@ export interface InventoryState {
 
   /**
    * Eldeki plağı GRAMOFONA yerleştir.
-   *  - Geri dönen `swappedOut`: gramofonda daha önce yüklü olan plak. Caller
-   *    bunu otomatik olarak ele geri verebilir (swap) veya yere düşürebilir.
-   *  - `collected` setine yeni gelen plağın order'ı eklenir (kalıcı).
-   *  - `activeOrder` yeni gelene set edilir.
+   *  - `collected` setine yeni gelen plağın order'ı eklenir ve KALICI olarak
+   *    kalır (plak gramofondan düşse bile listede görünmeye devam eder).
+   *  - `activeOrder` yeni gelene set edilir; eski aktif (varsa) koleksiyonda
+   *    KALIR — oyuncu panelden tekrar seçip çalabilir.
+   *  - El (`carriedOrder`) boşalır; eski plak ele geri DÖNMEZ.
    *
    * Elde plak yoksa bu fonksiyon hiç bir şey yapmaz ve `null` döner.
+   * Dönen `previousActive`: gramofonda daha önce aktif olan plağın order'ı
+   * (yoksa 0) — yalnızca bilgilendirme amaçlı, caller'ın hareket alması gerekmez.
    */
-  placeCarriedOnGramophone(): { placed: number; swappedOut: number } | null;
+  placeCarriedOnGramophone(): { placed: number; previousActive: number } | null;
 
   /**
    * Gramofondaki plağı elden AL — plak gramofonu terk eder, ele geçer.
@@ -125,16 +128,19 @@ export function createInventory(): InventoryState {
     placeCarriedOnGramophone() {
       if (carriedOrder === 0) return null;
       const placed = carriedOrder;
-      const swappedOut = activeOrder;
+      const previousActive = activeOrder;
+      /**
+       * Plak gramofona BİRİKİR — eski plak koleksiyondan (`collected`)
+       * çıkmaz; sadece aktif plak yenisiyle değişir. Böylece oyuncu
+       * istediği kadar plak ekleyebilir; hepsi panel listesinde kalır.
+       * Eski plak ELE dönmez; el boşalır. Oyuncu başka bir plağı yerden
+       * alıp tekrar gelip ekleyebilir.
+       */
       collected.add(placed);
       activeOrder = placed;
-      /**
-       * Atomik takas: yeni plak gramofona gidince gramofondaki eski plak
-       * (varsa) otomatik ELE geçer. Tek emit — UI'da boş-el flicker'ı olmaz.
-       */
-      carriedOrder = swappedOut;
+      carriedOrder = 0;
       emit();
-      return { placed, swappedOut };
+      return { placed, previousActive };
     },
     takeActiveToHand() {
       if (activeOrder === 0) return 0;

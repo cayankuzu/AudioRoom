@@ -241,16 +241,17 @@ export function startExperience(container: HTMLElement): void {
       if (inventory.carriedOrder > 0) {
         const result = inventory.placeCarriedOnGramophone();
         if (!result) return;
-        const { placed, swappedOut } = result;
+        const { placed, previousActive } = result;
         /**
          * Gramofon mesh state'i ve carry görseli `inventory.onChange` üzerinden
          * atomik olarak güncellenir (tek emit). Burada yalnızca müziği başlat.
+         * Eski plak (varsa) panel listesinde KALIR — oyuncu ordan tekrar çalabilir.
          */
         albumPanel.playOrder(placed);
-        if (swappedOut > 0) {
+        if (previousActive > 0 && previousActive !== placed) {
           console.log(
             "[Plak]",
-            `Gramofona yerleştirildi (swap) → yeni=${placed}, ele geri dönen=${swappedOut}`,
+            `Gramofona eklendi → aktif=${placed}, önceki aktif listede: ${previousActive}`,
           );
         } else {
           console.log("[Plak]", `Gramofona yerleştirildi → order=${placed}`);
@@ -359,7 +360,7 @@ export function startExperience(container: HTMLElement): void {
      */
     if (inventory.carriedOrder > 0) {
       if (gramophone.activeOrder > 0) {
-        ud.interactable.promptText = "E — plakları değiştir · Y — taşı";
+        ud.interactable.promptText = "E — plağı ekle (önceki listede kalır) · Y — taşı";
       } else {
         ud.interactable.promptText = "E — plağı tak · Y — taşı";
       }
