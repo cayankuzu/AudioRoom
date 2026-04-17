@@ -2174,254 +2174,469 @@ body.is-touch {
   /** Pinch-zoom / double-tap zoom'u devre dışı bırak. */
   touch-action: none;
   overscroll-behavior: none;
-}
-
-body.is-touch #app,
-body.is-touch #experience {
+  /** Scroll'u kilitle — sayfa fiziksel olarak dikey kaymasın ki tarayıcı
+      adres barını otomatik geri getirmesin. */
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
   height: 100vh;
   height: 100dvh;
 }
 
-/* Mobilde HUD (Kontroller kartı) ve Ekran Görüntüsü / Paylaş paneli
- * tamamen gizlidir — klavyeye özel bir arayüz, dokunmatik UX'i kirletmesin. */
+/* Gerçekten fullscreen'deyken tarayıcı barları zaten gizli — bu state'i
+   işaretleyip banner/toolbar hint'lerini ayarlayabiliyoruz. */
+body.is-fullscreen .pc-hint-banner {
+  top: 0.4rem;
+}
+
+body.is-touch #app,
+body.is-touch #experience {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Mobilde gereksiz arayüzler tamamen gizli — dokunmatik UX'i kirletmesin. */
 body.is-touch .hud,
-body.is-touch .capture-panel {
+body.is-touch .capture-panel,
+body.is-touch .bright-panel {
   display: none !important;
 }
 
-/* Minimap — SOL ÜST. Toolbar sağ üstte olduğu için çakışma yok. */
+/* Minimap — SOL ÜST, kompakt. Album panel açıkken altında kalır. */
 body.is-touch .minimap {
-  left: max(0.4rem, env(safe-area-inset-left));
-  top: max(0.4rem, env(safe-area-inset-top));
+  left: max(0.35rem, env(safe-area-inset-left));
+  top: max(0.35rem, env(safe-area-inset-top));
   bottom: auto;
   right: auto;
-  width: 150px;
-  padding: 0.35rem 0.4rem 0.4rem;
-  z-index: 20;
-  background: rgba(10, 10, 12, 0.7);
+  width: 128px;
+  padding: 0.3rem 0.38rem 0.35rem;
+  z-index: 18;
+  background: rgba(10, 10, 12, 0.72);
 }
 
 body.is-touch .minimap.is-collapsed {
   width: auto;
-  min-width: 98px;
-  padding: 0.32rem 0.5rem 0.36rem;
+  min-width: 92px;
+  padding: 0.28rem 0.5rem 0.32rem;
 }
 
 body.is-touch .minimap__head {
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   letter-spacing: 0.18em;
-  padding: 0 0.2rem 0.25rem;
+  padding: 0 0.18rem 0.22rem;
 }
 
-/* Album paneli — mobile: SOL tarafta, tam yüksekliği ölçekli kullan, içerisi
- * gerekirse kayar. YouTube embed + kontroller + parça listesi dikey
- * düzende. Minimap ile çakışır ama albüm paneli açıkken minimap geçici
- * olarak arkada kalır; kapatınca tekrar görünür. */
+body.is-touch .minimap__canvas {
+  width: 100%;
+  height: auto;
+}
+
+/* ===========================================================
+   ALBÜM PANELİ — MOBİL KOMPAKT
+   Sadece başlık + parça listesi. iframe, progress, kontroller,
+   kicker/meta, tracks-head hepsi gizli. Sol üst köşede dursun,
+   toolbar + minimap ile çakışmayacak boyutta.
+   =========================================================== */
 body.is-touch .album-panel {
-  left: max(0.4rem, env(safe-area-inset-left));
+  left: max(0.35rem, env(safe-area-inset-left));
   right: auto;
-  top: max(0.4rem, env(safe-area-inset-top));
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 46px);
   bottom: auto;
-  width: min(320px, 62vw);
-  min-width: 200px;
-  max-height: calc(100dvh - max(0.8rem, env(safe-area-inset-top)) - 0.4rem);
+  width: min(240px, 62vw);
+  min-width: 180px;
+  max-height: calc(
+    100dvh - max(0.35rem, env(safe-area-inset-top)) - 46px - 170px
+  );
   display: flex;
   flex-direction: column;
   z-index: 22;
+  padding: 0;
+  border-radius: 10px;
 }
 
-/* Açıkken iç kısım kayabilir — telefon dik modunda bile parça listesi ve
- * video üst üste taşmadan yerleşir. */
+body.is-touch .album-panel__head {
+  padding: 0.4rem 0.55rem 0.35rem;
+  gap: 0.3rem;
+}
+
+body.is-touch .album-panel__titles {
+  gap: 0.1rem;
+}
+
+body.is-touch .album-panel__kicker,
+body.is-touch .album-panel__meta,
+body.is-touch .album-panel__frame-wrap,
+body.is-touch .album-panel__progress,
+body.is-touch .album-panel__controls,
+body.is-touch .album-panel__tracks-head {
+  display: none !important;
+}
+
+body.is-touch .album-panel__title {
+  font-size: 0.82rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.is-touch .album-panel__collapse {
+  width: 24px;
+  height: 24px;
+  font-size: 0.95rem;
+}
+
 body.is-touch .album-panel__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  padding: 0.5rem 0.55rem 0.6rem;
+  overflow: hidden;
+  padding: 0 0.35rem 0.4rem;
+  gap: 0.3rem;
 }
 
-body.is-touch .album-panel__frame-wrap {
-  flex: 0 0 auto;
+body.is-touch .album-panel__tracks {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 body.is-touch .album-panel__list {
-  max-height: 140px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: 0.25rem 0.15rem 0.3rem;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
-/* Kapalıyken minimal header bar — minimap'in hemen altında dursun. */
+body.is-touch .album-panel__track {
+  padding: 0.42rem 0.5rem;
+  font-size: 0.72rem;
+  gap: 0.4rem;
+}
+
+body.is-touch .album-panel__track-index {
+  font-size: 0.58rem;
+  min-width: 1.4ch;
+}
+
+/* Kapalıyken sadece başlık çubuğu. */
 body.is-touch .album-panel.is-collapsed {
   max-height: none;
-  width: min(240px, 55vw);
+  width: min(200px, 52vw);
 }
 
-/* Parlaklık paneli — toolbar sağ ÜSTTE ama ana içerikten uzakta olsun
- * diye toolbar'ın hemen ALTINDA (44px kaydırılmış) sağa hizalı kalır. */
-body.is-touch .bright-panel {
-  top: calc(max(0.5rem, env(safe-area-inset-top)) + 52px);
-  right: max(0.5rem, env(safe-area-inset-right));
-  min-width: 180px;
-  padding: 0.4rem 0.55rem;
-}
-
-/* Experience back nav — mobilde hud ile çakışır, sağ üst yerine gizleme.
-   Gizlemek yerine biraz kaydır. */
+/* Experience back nav — sol üstte ama album/map ile çakışmasın;
+   mobilde gizli, zaten ana menüye dönmek için Pause → geri var. */
 body.is-touch .experience-back-nav {
-  top: 0.45rem;
-  left: 0.45rem;
-  z-index: 45;
+  display: none !important;
 }
 
-body.is-touch .experience-back-nav__btn {
-  padding: 0.3rem 0.7rem 0.3rem 0.4rem;
-  font-size: 0.7rem;
-}
-
-/* HUD, minimap, album panel mobilde biraz daha şeffaf */
-body.is-touch .hud,
+/* Yumuşak gölge — panelleri üstten biraz yüzdür */
 body.is-touch .minimap,
-body.is-touch .album-panel,
-body.is-touch .bright-panel {
+body.is-touch .album-panel {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
-/* Interaction hint — mobilde D-pad/action arasında ortalan, biraz yukarı taşı */
+/* Interaction hint — d-pad + aksiyon arasında ortada kalsın; d-pad 170px
+   olduğu için alt 182px yeterli güvenli mesafe. */
 body.is-touch .interaction-hint {
-  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 188px);
-  font-size: 0.72rem;
-  padding: 0.4rem 0.7rem 0.38rem;
+  bottom: calc(max(0.4rem, env(safe-area-inset-bottom)) + 172px);
+  font-size: 0.7rem;
+  padding: 0.38rem 0.65rem 0.36rem;
+  max-width: 72vw;
+  text-align: center;
 }
 
-/* Brand footer — mobilde d-pad ile çakışabilir; hafifçe göze almak için ortada tut ama küçült.
-   D-pad 168px, action 162px; alt orta gezilebilir. */
+/* Brand footer — mobilde tamamen gizli; alt orta d-pad+aksiyon
+   hatalarını önle. */
 body.is-touch .brand-footer {
-  bottom: 0.25rem;
-  font-size: 0.52rem;
-  letter-spacing: 0.12em;
-  padding: 0.14rem 0.5rem;
-  opacity: 0.6;
+  display: none !important;
 }
 
 /* Start overlay — mobilde kart kompakt */
 body.is-touch .start-overlay__card {
-  padding: 1.4rem 1.3rem 1.2rem;
+  padding: 1.2rem 1.1rem 1.05rem;
   max-width: min(420px, 88vw);
+  max-height: 92dvh;
+  overflow-y: auto;
   border-radius: 16px;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 body.is-touch .start-overlay h2 {
-  font-size: 1.4rem;
+  font-size: 1.3rem;
 }
 
 body.is-touch .start-overlay__desc {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 body.is-touch .start-overlay__controls {
-  gap: 0.3rem 0.5rem;
+  gap: 0.28rem 0.45rem;
 }
 
 body.is-touch .start-overlay__ctrl {
-  padding: 0.36rem 0.55rem;
-  font-size: 0.7rem;
+  padding: 0.32rem 0.5rem;
+  font-size: 0.66rem;
 }
 
 body.is-touch .start-overlay__cta {
-  padding: 0.85rem 1.6rem;
-  font-size: 0.9rem;
+  padding: 0.85rem 1.4rem;
+  font-size: 0.88rem;
+  letter-spacing: 0.1em;
 }
 
-/* Mobil · TELEFON YATAY (kısa yükseklik, geniş ekran) — d-pad/toolbar
-   boyutlarını biraz küçülterek merkeze oyun alanı bırak. */
-@media (max-width: 1000px) and (max-height: 520px) and (orientation: landscape) {
+/* ===========================================================
+   PC HINT BANNER — üst orta, periyodik fade
+   =========================================================== */
+.pc-hint-banner {
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translate(-50%, -14px);
+  z-index: 30;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem 0.36rem;
+  background: rgba(14, 14, 18, 0.82);
+  color: #f1e9d8;
+  border: 1px solid rgba(244, 214, 117, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease, transform 380ms ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: min(88vw, 420px);
+  white-space: nowrap;
+}
+
+body.is-touch .pc-hint-banner {
+  display: inline-flex;
+}
+
+.pc-hint-banner.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.pc-hint-banner strong {
+  color: #fff2c7;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.pc-hint-banner__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.78;
+}
+
+.pc-hint-banner__text {
+  line-height: 1.1;
+}
+
+/* UI gizliyken banner da gizlensin — hemen sakinleşsin. */
+body.is-ui-hidden .pc-hint-banner {
+  opacity: 0 !important;
+  transform: translate(-50%, -14px) !important;
+}
+
+/* ===========================================================
+   FULLSCREEN BUTONU — enter / exit icon state
+   =========================================================== */
+.mobile-controls__tool-fs-enter,
+.mobile-controls__tool-fs-exit {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-controls__tool-fs-exit {
+  display: none;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs .mobile-controls__tool-fs-enter {
+  display: none;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs .mobile-controls__tool-fs-exit {
+  display: inline-block;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
+  background: rgba(244, 214, 117, 0.22);
+  border-color: rgba(244, 214, 117, 0.55);
+  color: #fff;
+}
+
+/* =========================================================================
+   TELEFON DİK (portrait) — dar genişlik, uzun yükseklik
+   ========================================================================= */
+@media (orientation: portrait) and (max-width: 900px) {
   body.is-touch .mobile-controls__dpad {
-    width: 148px;
-    height: 148px;
-    left: 0.6rem;
-    bottom: 0.6rem;
+    width: 162px;
+    height: 162px;
+    left: max(0.5rem, env(safe-area-inset-left));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    gap: 6px;
+  }
+
+  body.is-touch .mobile-controls__actions {
+    grid-template-columns: repeat(2, 72px);
+    grid-template-rows: repeat(2, 72px);
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    gap: 9px;
+  }
+
+  body.is-touch .mobile-controls__toolbar {
+    top: max(0.4rem, env(safe-area-inset-top));
+    right: max(0.4rem, env(safe-area-inset-right));
     gap: 5px;
+    padding: 3px;
+  }
+
+  body.is-touch .mobile-controls__tool {
+    width: 36px;
+    height: 36px;
+  }
+
+  body.is-touch .album-panel {
+    width: min(220px, 58vw);
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 44px);
+    max-height: calc(
+      100dvh - max(0.35rem, env(safe-area-inset-top)) - 44px - 182px
+    );
+  }
+
+  body.is-touch .minimap {
+    width: 118px;
+  }
+
+  /* Dikey telefonda (dar) — interaction hint d-pad/action üstünde duruyor
+     ama çok yakın değilse rahat. */
+  body.is-touch .interaction-hint {
+    bottom: calc(max(0.4rem, env(safe-area-inset-bottom)) + 178px);
+    max-width: 86vw;
+  }
+}
+
+/* Çok dar telefonlar (iPhone SE, 360w) — album daha da sıkıştır */
+@media (orientation: portrait) and (max-width: 380px) {
+  body.is-touch .album-panel {
+    width: min(200px, 56vw);
+  }
+
+  body.is-touch .mobile-controls__dpad {
+    width: 152px;
+    height: 152px;
   }
 
   body.is-touch .mobile-controls__actions {
     grid-template-columns: repeat(2, 66px);
     grid-template-rows: repeat(2, 66px);
-    right: 0.6rem;
-    bottom: 0.6rem;
-    gap: 8px;
+  }
+}
+
+/* =========================================================================
+   TELEFON YATAY (landscape) — kısa yükseklik, geniş genişlik
+   ========================================================================= */
+@media (max-width: 1000px) and (max-height: 520px) and (orientation: landscape) {
+  body.is-touch .mobile-controls__dpad {
+    width: 138px;
+    height: 138px;
+    left: max(0.45rem, env(safe-area-inset-left));
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  body.is-touch .mobile-controls__actions {
+    grid-template-columns: repeat(2, 62px);
+    grid-template-rows: repeat(2, 62px);
+    right: max(0.45rem, env(safe-area-inset-right));
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+    gap: 7px;
   }
 
   body.is-touch .mobile-controls__action-glyph {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
 
   body.is-touch .mobile-controls__action-label {
-    font-size: 0.48rem;
-    letter-spacing: 0.18em;
+    font-size: 0.46rem;
+    letter-spacing: 0.16em;
   }
 
   body.is-touch .mobile-controls__pad svg {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
 
   body.is-touch .mobile-controls__toolbar {
-    top: 0.35rem;
-    right: 0.35rem;
+    top: max(0.3rem, env(safe-area-inset-top));
+    right: max(0.3rem, env(safe-area-inset-right));
+    gap: 4px;
+    padding: 2px;
   }
 
   body.is-touch .mobile-controls__tool {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
 
   body.is-touch .mobile-controls__tool svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  body.is-touch .mobile-controls__tool-eye-open,
+  body.is-touch .mobile-controls__tool-eye-closed,
+  body.is-touch .mobile-controls__tool-fs-enter,
+  body.is-touch .mobile-controls__tool-fs-exit {
     width: 17px;
     height: 17px;
   }
 
   body.is-touch .minimap {
-    width: 128px;
-    top: 0.35rem;
+    width: 110px;
+    top: max(0.3rem, env(safe-area-inset-top));
   }
 
   body.is-touch .album-panel {
-    width: min(300px, 48vw);
-    min-width: 180px;
-    top: 0.35rem;
-  }
-
-  body.is-touch .album-panel__list {
-    max-height: 110px;
+    width: min(220px, 42vw);
+    min-width: 170px;
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 38px);
+    max-height: calc(
+      100dvh - max(0.3rem, env(safe-area-inset-top)) - 38px - 148px
+    );
   }
 
   body.is-touch .interaction-hint {
-    bottom: calc(0.6rem + 166px);
-    font-size: 0.66rem;
+    bottom: calc(max(0.45rem, env(safe-area-inset-bottom)) + 148px);
+    font-size: 0.64rem;
+    max-width: 60vw;
   }
 
-  body.is-touch .brand-footer {
-    display: none;
-  }
-
-  body.is-touch .bright-panel {
-    min-width: 152px;
-    top: calc(0.35rem + 44px);
-  }
-}
-
-/* TELEFON DİK (portrait) — yatayda daha rahat olacağı için uyar. */
-@media (orientation: portrait) and (max-width: 760px) {
-  body.is-touch .mobile-controls__dpad {
-    width: 156px;
-    height: 156px;
-  }
-
-  body.is-touch .album-panel {
-    width: min(92vw, 360px);
-    top: max(0.4rem, env(safe-area-inset-top));
-    max-height: calc(100dvh - 200px);
-  }
-
-  body.is-touch .minimap {
-    width: 140px;
+  body.is-touch .pc-hint-banner {
+    font-size: 0.55rem;
+    padding: 0.28rem 0.55rem 0.3rem;
   }
 }
 

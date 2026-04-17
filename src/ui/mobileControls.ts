@@ -5,36 +5,38 @@ export interface MobileControls {
   element: HTMLElement;
   /** Göster / gizle (start overlay sırasında gizlenir, oyun başlayınca açılır). */
   setVisible(v: boolean): void;
+  /** Fullscreen butonu basılı görünümü (external state sync). */
+  setFullscreenActive(active: boolean): void;
   dispose(): void;
 }
 
 export interface MobileControlsOptions {
-  /**
-   * Hangi kanvas elementinin üstünde parmak sürüklerken kamera dönsün?
-   * (Genelde renderer.domElement veya onun parent'ı).
-   */
-  lookTarget: HTMLElement;
-  /** Aksiyon callbacks — butonlara basınca tetiklenirler. */
+  /** Oyunun yerleştiği container — look drag bu ağaç içinde dinlenir. */
+  container: HTMLElement;
+  /** Aksiyon callback'leri — butonlara basınca tetiklenirler. */
   onToggleFlashlight: () => void;
   onToggleMap: () => void;
   onTogglePanel: () => void;
-  onToggleBrightness: () => void;
   onPause: () => void;
+  onToggleFullscreen: () => void;
 }
 
 /**
  * Dokunmatik cihazlar için yerleşik kontrol overlay'i.
  *
- * Düzen (yatay telefon için optimize):
+ * Düzen (mobil optimize):
  *  - SOL ALT: Yön ok pad'i (↑↓←→) — WASD/Arrow tuşlarını simüle eder.
- *  - SAĞ ALT: Aksiyon butonları (E = al/kullan, Q = bırak, R = çal/durdur).
- *  - SAĞ ÜST (küçük): Fener, Harita, Albüm paneli, HUD, Parlaklık, Duraklat.
- *  - SERBEST BÖLGE (kanvas üzerinde): parmak sürükleme → kamera bakışı
- *    (pointer-lock olmadan).
+ *  - SAĞ ALT: Aksiyon butonları (E = al/kullan, Q = bırak, R = çal, ZIPLA).
+ *  - SAĞ ÜST: Göz / Fener / Harita / Albüm / Tam ekran / Duraklat.
+ *  - EKRANIN GERİ KALANI: parmak sürükleme → kamera bakışı (her yerden).
+ *
+ * Look drag document seviyesinde dinlenir; event target bir butona,
+ * panele veya overlay'e düşüyorsa bakış başlamaz — onun yerine ilgili
+ * interaktif element kendi işini yapar. Bu sayede "ortada ölü alan"
+ * yok; ekranın herhangi bir boş yerinden sağa-sola çevrilebilir.
  *
  * Butonlar `inputSystem.setVirtualKey(code, pressed)` ile gerçek klavye
- * tuşuymuş gibi çalışır; bu sayede hareket/etkileşim sistemlerine ek kod
- * gerekmez.
+ * tuşuymuş gibi çalışır; hareket/etkileşim sistemlerine ek kod gerekmez.
  */
 export function createMobileControls(
   parent: HTMLElement,
@@ -97,8 +99,9 @@ export function createMobileControls(
       <button type="button" class="mobile-controls__tool" data-tool="panel" aria-label="Albüm paneli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>
       </button>
-      <button type="button" class="mobile-controls__tool" data-tool="brightness" aria-label="Parlaklık">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.5 5.5l1.5 1.5M17 17l1.5 1.5M5.5 18.5L7 17M17 7l1.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <button type="button" class="mobile-controls__tool mobile-controls__tool--fs" data-tool="fullscreen" aria-label="Tam ekran" aria-pressed="false">
+        <svg class="mobile-controls__tool-fs-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="mobile-controls__tool-fs-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <button type="button" class="mobile-controls__tool mobile-controls__tool--pause" data-tool="pause" aria-label="Duraklat">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
@@ -116,12 +119,12 @@ export function createMobileControls(
    * `setPointerCapture` — parmak butondan kayarsa bile release eventi
    * garanti gelir.
    */
-  const bindings: Array<{ btn: HTMLElement; code: string; releaseOnUp: boolean }> = [];
+  const bindings: Array<{ btn: HTMLElement; code: string }> = [];
 
   const keyButtons = root.querySelectorAll<HTMLButtonElement>("[data-key]");
   keyButtons.forEach((btn) => {
     const code = btn.dataset.key as string;
-    bindings.push({ btn, code, releaseOnUp: true });
+    bindings.push({ btn, code });
   });
 
   function press(code: string): void {
@@ -130,9 +133,6 @@ export function createMobileControls(
   function release(code: string): void {
     input.setVirtualKey(code, false);
   }
-
-  const pressHandlers = new Map<HTMLElement, (e: PointerEvent) => void>();
-  const releaseHandlers = new Map<HTMLElement, (e: PointerEvent) => void>();
 
   bindings.forEach(({ btn, code }) => {
     const onDown = (e: PointerEvent) => {
@@ -162,9 +162,6 @@ export function createMobileControls(
      * kombinasyonuyla güvenli release garantisi.
      */
     btn.addEventListener("lostpointercapture", onUp);
-    /** Sayfa focus kaybederse butonu bırak. */
-    pressHandlers.set(btn, onDown);
-    releaseHandlers.set(btn, onUp);
   });
 
   /**
@@ -187,8 +184,8 @@ export function createMobileControls(
     flashlight: opts.onToggleFlashlight,
     map: opts.onToggleMap,
     panel: opts.onTogglePanel,
-    brightness: opts.onToggleBrightness,
     pause: opts.onPause,
+    fullscreen: opts.onToggleFullscreen,
     eye: toggleEye,
   };
   const toolBtns = root.querySelectorAll<HTMLButtonElement>("[data-tool]");
@@ -201,7 +198,6 @@ export function createMobileControls(
       e.stopPropagation();
       fn();
     });
-    /** Tap feedback — pointerdown'da fade */
     btn.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
       btn.classList.add("is-pressed");
@@ -213,63 +209,78 @@ export function createMobileControls(
   });
 
   /** ===============================
-   *  LOOK DRAG — kanvas üstünde sürükle, kamerayı döndür.
+   *  LOOK DRAG — ekranın her yerinden.
+   *
+   *  Pointer `document` seviyesinde dinlenir. Eğer başlangıç target'ı bir
+   *  interaktif element (buton, slider, album panel, minimap vs.) ise
+   *  o element kendi event'ini tüketir ve biz skip ederiz. Aksi halde
+   *  look drag başlar — canvas'ın hangi noktasına dokunursa dokunsun,
+   *  başka bir overlay kısmı değilse, kamera parmakla çevrilebilir.
    *  =============================== */
-  const lookTarget = opts.lookTarget;
-  /** Aktif look parmağı id → önceki pozisyonu. */
+  const lookSkipSelector = [
+    ".mobile-controls__pad",
+    ".mobile-controls__action",
+    ".mobile-controls__tool",
+    ".mobile-controls__dpad",
+    ".mobile-controls__actions",
+    ".mobile-controls__toolbar",
+    ".album-panel",
+    ".minimap",
+    ".bright-panel",
+    ".start-overlay",
+    ".experience-back-nav",
+    ".pc-hint-banner",
+    ".hud",
+    ".capture-panel",
+    "button",
+    "input",
+    "a",
+    "iframe",
+    "[role='slider']",
+  ].join(", ");
+
   let lookPointerId: number | null = null;
   let lastX = 0;
   let lastY = 0;
 
-  /**
-   * `target` elementine gelen pointer eventleri (mouse dahil) değil, yalnızca
-   * touch-type pointer'larla tetiklenmeli — yoksa masaüstünde mobile-controls
-   * hiç mount edilmediği için bu zaten tetiklenmez, ama yine de guard.
-   */
-  const onCanvasPointerDown = (e: PointerEvent) => {
+  const onDocPointerDown = (e: PointerEvent) => {
     if (e.pointerType === "mouse") return;
-    /** Kontrol butonunun üstüne iniyorsa look için kullanma. */
-    const t = e.target as HTMLElement | null;
-    if (t && t.closest(".mobile-controls")) return;
     if (lookPointerId !== null) return;
+    const t = e.target as HTMLElement | null;
+    if (t && t.closest(lookSkipSelector)) return;
     lookPointerId = e.pointerId;
     lastX = e.clientX;
     lastY = e.clientY;
-    try {
-      lookTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* yok say */
-    }
+    /**
+     * Pointer capture yapmıyoruz — iOS Safari'de document üstünde setPointerCapture
+     * ekseriyetle hata verir. Bunun yerine hareket/bitiş eventlerini `document`
+     * seviyesinde dinleyerek pointer-id eşleştirmesiyle takip ediyoruz.
+     */
   };
 
-  const onCanvasPointerMove = (e: PointerEvent) => {
+  const onDocPointerMove = (e: PointerEvent) => {
     if (e.pointerId !== lookPointerId) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
     /**
-     * Hassasiyet: mouse ile 0.0022/0.0018, dokunmatikte biraz daha yumuşak
-     * ama hızlı pan için yeterli. Pozitif X mouseda sağa → yaw azalır
-     * (look.x -= dx). Aynı davranışı burada da kuruyoruz.
+     * Hassasiyet: dokunmatikte biraz daha yumuşak ama hızlı pan için yeterli.
+     * Pozitif X parmak sağa kayar → yaw azalır (look.x -= dx). Mouse
+     * davranışıyla aynı yön.
      */
     input.injectLook(-dx * 0.0042, -dy * 0.0034);
   };
 
-  const onCanvasPointerEnd = (e: PointerEvent) => {
+  const onDocPointerEnd = (e: PointerEvent) => {
     if (e.pointerId !== lookPointerId) return;
     lookPointerId = null;
-    try {
-      lookTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* yok say */
-    }
   };
 
-  lookTarget.addEventListener("pointerdown", onCanvasPointerDown);
-  lookTarget.addEventListener("pointermove", onCanvasPointerMove);
-  lookTarget.addEventListener("pointerup", onCanvasPointerEnd);
-  lookTarget.addEventListener("pointercancel", onCanvasPointerEnd);
+  document.addEventListener("pointerdown", onDocPointerDown, { passive: true });
+  document.addEventListener("pointermove", onDocPointerMove, { passive: true });
+  document.addEventListener("pointerup", onDocPointerEnd, { passive: true });
+  document.addEventListener("pointercancel", onDocPointerEnd, { passive: true });
 
   /**
    * iOS Safari default olarak two-finger pinch-zoom ve double-tap zoom
@@ -281,6 +292,8 @@ export function createMobileControls(
 
   let visible = true;
 
+  const fsBtn = root.querySelector<HTMLButtonElement>('[data-tool="fullscreen"]');
+
   return {
     element: root,
     setVisible(v) {
@@ -288,11 +301,15 @@ export function createMobileControls(
       visible = v;
       root.classList.toggle("is-hidden", !v);
     },
+    setFullscreenActive(active) {
+      if (!fsBtn) return;
+      fsBtn.setAttribute("aria-pressed", String(active));
+    },
     dispose() {
-      lookTarget.removeEventListener("pointerdown", onCanvasPointerDown);
-      lookTarget.removeEventListener("pointermove", onCanvasPointerMove);
-      lookTarget.removeEventListener("pointerup", onCanvasPointerEnd);
-      lookTarget.removeEventListener("pointercancel", onCanvasPointerEnd);
+      document.removeEventListener("pointerdown", onDocPointerDown);
+      document.removeEventListener("pointermove", onDocPointerMove);
+      document.removeEventListener("pointerup", onDocPointerEnd);
+      document.removeEventListener("pointercancel", onDocPointerEnd);
       document.removeEventListener("gesturestart", onGestureStart);
       document.body.classList.remove("is-ui-hidden");
       root.remove();

@@ -45,6 +45,15 @@ import { createBrandFooter } from "../ui/brandFooter";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 import { createMobileControls } from "../ui/mobileControls";
+import { createPcHintBanner } from "../ui/pcHintBanner";
+import {
+  exitFullscreen,
+  isFullscreen,
+  isFullscreenSupported,
+  onFullscreenChange,
+  requestFullscreen,
+  tryHideMobileAddressBar,
+} from "../utils/fullscreen";
 
 export function startExperience(container: HTMLElement): void {
   /** --- Oturum bazlı seed: her yüklemede dünya farklı ama mantıklı dizilir. --- */
@@ -238,24 +247,65 @@ export function startExperience(container: HTMLElement): void {
    * edildi: sol-alt d-pad, sağ-alt aksiyon butonları, sağ-üst minyatür
    * toolbar (fener, harita, albüm, kontroller, parlaklık, duraklat).
    */
+  /**
+   * Fullscreen toggle — mobil toolbar butonu ve start overlay ilk dokunma
+   * sırasında çağrılır. iOS Safari'de reject olabilir; o durumda `catch`
+   * ile sessizce geç, scroll trick yine çalışır.
+   */
+  async function toggleFullscreen(): Promise<void> {
+    try {
+      if (isFullscreen()) {
+        await exitFullscreen();
+      } else if (isFullscreenSupported()) {
+        await requestFullscreen(document.documentElement);
+      }
+    } catch {
+      /* iOS veya reddedildi — sessizce geç */
+    }
+    tryHideMobileAddressBar();
+  }
+
   const mobileControls = input.isTouch
     ? createMobileControls(container, input, {
-        lookTarget: renderer.domElement,
+        container,
         onToggleFlashlight: () => flashlight.toggle(),
         onToggleMap: () => minimap.toggle(),
         onTogglePanel: () => albumPanel.toggle(),
-        onToggleBrightness: () => brightness.toggle(),
         onPause: () => input.releaseLock(),
+        onToggleFullscreen: () => {
+          void toggleFullscreen();
+        },
       })
     : null;
+
   /**
    * Mobil iken `<body>`a bir sınıf ekle → CSS, panelleri (HUD, minimap,
    * album panel, bright-panel, capture-panel) yatay telefonda sığacak
    * şekilde kompakt moduna alır.
    */
+  const pcHintBanner = input.isTouch ? createPcHintBanner(container) : null;
+  let unwatchFullscreen: (() => void) | null = null;
+
   if (input.isTouch) {
     document.body.classList.add("is-touch");
     mobileControls?.setVisible(false);
+    /**
+     * Harita varsayılan olarak kapalı başlasın — sol üst köşede albüm paneli
+     * ile çakışmasın. Oyuncu harita butonundan tekrar açabilir.
+     */
+    if (minimap.isOpen()) minimap.toggle();
+    tryHideMobileAddressBar();
+    window.addEventListener("orientationchange", tryHideMobileAddressBar);
+    /** Fullscreen state → toolbar butonunun görünümü senkronize. */
+    unwatchFullscreen = onFullscreenChange(() => {
+      const active = isFullscreen();
+      mobileControls?.setFullscreenActive(active);
+      document.body.classList.toggle("is-fullscreen", active);
+      tryHideMobileAddressBar();
+    });
+    /** İlk durum senkronizasyonu. */
+    mobileControls?.setFullscreenActive(isFullscreen());
+    document.body.classList.toggle("is-fullscreen", isFullscreen());
   }
 
   /**
@@ -448,6 +498,15 @@ export function startExperience(container: HTMLElement): void {
   });
 
   startOverlay.onStart(() => {
+    /**
+     * Mobilde: start user-gesture'i sırasında fullscreen iste. Zorunlu değil
+     * — iOS Safari API'yi desteklemeyebilir; reddedildiğinde oyun yine
+     * başlar ve scroll trick ile adres barı olabildiğince gizlenir.
+     */
+    if (input.isTouch) {
+      void toggleFullscreenForStart();
+      tryHideMobileAddressBar();
+    }
     input.requestLock();
     /**
      * İlk user-gesture — WebAudio AudioContext'i ayağa kaldırılabilir.
@@ -455,10 +514,21 @@ export function startExperience(container: HTMLElement): void {
      */
     ambient.start();
   });
+
+  async function toggleFullscreenForStart(): Promise<void> {
+    if (isFullscreen() || !isFullscreenSupported()) return;
+    try {
+      await requestFullscreen(document.documentElement);
+    } catch {
+      /* iOS iPhone vs — sessizce geç */
+    }
+  }
+
   input.onLockChange((locked) => {
     if (locked) {
       startOverlay.hide();
       mobileControls?.setVisible(true);
+      pcHintBanner?.start();
     } else {
       startOverlay.show();
       /**
@@ -466,6 +536,7 @@ export function startExperience(container: HTMLElement): void {
        * yanlışlıkla D-pad'e değmesin.
        */
       mobileControls?.setVisible(false);
+      pcHintBanner?.stop();
     }
   });
 

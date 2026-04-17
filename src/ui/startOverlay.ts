@@ -35,6 +35,9 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
       (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0));
 
   const startWord = isTouch ? "dokunun" : "tıklayın";
+  const ctaText = isTouch
+    ? "TAM EKRANA GEÇ VE BAŞLA"
+    : `Başlamak için ${startWord}`;
   const controlsHtml = isTouch
     ? `
         <div class="start-overlay__ctrl"><span>↑↓←→</span><em>Yürü</em></div>
@@ -53,7 +56,7 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
         <div class="start-overlay__ctrl"><span>Shift</span><em>Koş</em></div>
       `;
   const noteHtml = isTouch
-    ? `<p class="start-overlay__note">Telefonu yatay çevirerek kullanmanız tavsiye edilir.</p>`
+    ? `<p class="start-overlay__note">Oyun tam ekranda başlayacak. Telefonu yatay tutmak tavsiye edilir.</p>`
     : `<p class="start-overlay__note">Gramofona plak takılmadan müzik başlamaz.</p>`;
 
   el.innerHTML = `
@@ -68,7 +71,7 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
       <div class="start-overlay__controls" role="group" aria-label="Kontroller">
         ${controlsHtml}
       </div>
-      <button type="button" class="start-overlay__cta" data-start>Başlamak için ${startWord}</button>
+      <button type="button" class="start-overlay__cta" data-start>${ctaText}</button>
       ${noteHtml}
     </div>
     <div class="start-overlay__card start-overlay__card--pause" data-card="pause">
