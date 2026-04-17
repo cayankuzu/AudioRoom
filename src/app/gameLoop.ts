@@ -41,7 +41,6 @@ import { createHud } from "../ui/hud";
 import { createAlbumPlayerPanel } from "../ui/albumPlayerPanel";
 import { createBrightnessControl } from "../ui/brightnessControl";
 import { createCaptureControls } from "../ui/captureControls";
-import { createBrandFooter } from "../ui/brandFooter";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 import { createMobileControls } from "../ui/mobileControls";
@@ -231,10 +230,10 @@ export function startExperience(container: HTMLElement): void {
   const interactionHint = createInteractionHint(container);
   const minimap = createMinimap(container);
   /**
-   * Alt ortada duran minimal imza: "© 2026 · Powered by MeMoDe". Yalnızca
-   * DOM — sahneye hiçbir maliyeti yok, pointer-events: none.
+   * Brand footer artık `bootstrap.ts`'de `document.body` seviyesinde mount
+   * edilir — hem kütüphanede hem deneyimde kalıcı olarak görünür. Burada
+   * ikinci bir instance yaratmıyoruz.
    */
-  createBrandFooter(container);
 
   /**
    * --- Mobil dokunmatik kontrol katmanı ---

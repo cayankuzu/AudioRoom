@@ -127,11 +127,17 @@ export function createStartOverlay(parent: HTMLElement): StartOverlay {
       }
       el.classList.remove("is-hidden");
       visible = true;
+      /**
+       * Body'de `is-overlay-open` sınıfı — mobil CSS bu sınıfı kullanarak
+       * oyun içinde gizlediği brand-footer'ı overlay anında geri gösterir.
+       */
+      document.body.classList.add("is-overlay-open");
     },
     hide() {
       if (!hasStartedOnce) hasStartedOnce = true;
       el.classList.add("is-hidden");
       visible = false;
+      document.body.classList.remove("is-overlay-open");
     },
     onStart(cb) {
       handler = cb;

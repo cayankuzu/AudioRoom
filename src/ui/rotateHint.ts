@@ -1,32 +1,42 @@
 export interface RotateHint {
-  /** Ekran dikey olduğunda banner'ı göster; yatay olduğunda gizle.
-   *  Orientation değişimini dinler ve otomatik olarak güncellenir. */
-  attach(): void;
+  /** Periyodik görünürlüğü başlat (her `intervalMs` bir fade-in/out). */
+  start(): void;
+  /** Timer'ı durdur ve banner'ı anında gizle. */
+  stop(): void;
   /** Event dinleyicilerini sök ve DOM'dan kaldır. */
   dispose(): void;
 }
 
 export interface RotateHintOptions {
-  /** Kullanıcı "x" ile kapattığında bu oturum boyunca tekrar gösterme. */
-  dismissible?: boolean;
+  /** Göründüğünde ekranda kaç ms kalsın? (fade'lar hariç) */
+  visibleMs?: number;
+  /** Gösterimler arası aralık (görünür süre dahil). */
+  intervalMs?: number;
+  /** İlk gösterim için gecikme. */
+  initialDelayMs?: number;
 }
 
 /**
  * Mobil/tablet kullanıcılarına "daha iyi deneyim için cihazı yan çevirin"
- * uyarısını veren, üst-ortada safe-area farkındalı kalıcı pill.
+ * uyarısını veren, üst-orta safe-area farkındalı pulse banner.
  *
- * - Yalnızca dokunmatik cihazlarda çalışır (`matchMedia`).
- * - `orientation: portrait` iken görünür, yatay çevrildiğinde otomatik kaybolur.
- * - Kullanıcı tarafından kapatılabilir; kapatılınca bu sekme oturumunda
- *   tekrar gösterilmez (sessionStorage).
- * - `pointer-events` açık (kapatma X'i için), ancak banner canvas'ın üstündeki
- *   girdi akışını bloklamaz çünkü dar bir pill olarak konumlanır.
+ * Davranış:
+ *  - Yalnızca dokunmatik cihazlarda çalışır (matchMedia).
+ *  - `orientation: portrait` iken periyodik olarak (her `intervalMs`) görünür
+ *    olur, `visibleMs` sonra kaybolur. Yatay moda geçilirse anında gizlenir
+ *    ve periyodik gösterim tekrar tetiklenmez.
+ *  - Kütüphane + deneyim sahnelerinin ikisinde de çalışabilir; pc-hint-banner
+ *    ile ÇAKIŞMAMASI için çağıran taraf `initialDelayMs` ile faz farkı
+ *    verebilir (örn. pc-hint 0s, rotate 2.5s).
+ *  - pointer-events: none → canvas girdi akışını hiç etkilemez.
  */
 export function createRotateHint(
   parent: HTMLElement,
   opts: RotateHintOptions = {},
 ): RotateHint {
-  const dismissible = opts.dismissible ?? true;
+  const visibleMs = opts.visibleMs ?? 2400;
+  const intervalMs = opts.intervalMs ?? 5000;
+  const initialDelayMs = opts.initialDelayMs ?? 2500;
 
   /**
    * Dokunmatik olmayan cihazlarda (bilgisayar) hiç mount edilmez — gereksiz
@@ -45,91 +55,108 @@ export function createRotateHint(
   el.setAttribute("aria-live", "polite");
   el.innerHTML = `
     <span class="rotate-hint__icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
-        <rect x="4" y="2.5" width="9" height="15" rx="1.6"/>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
+        <rect x="4.5" y="2.5" width="8.5" height="15" rx="1.6"/>
         <path d="M13 10.5 L20 10.5 M17 7.5 L20 10.5 L17 13.5"/>
-        <circle cx="8.5" cy="14.8" r="0.7" fill="currentColor" stroke="none"/>
+        <circle cx="8.75" cy="14.8" r="0.7" fill="currentColor" stroke="none"/>
       </svg>
     </span>
     <span class="rotate-hint__text">Daha iyi deneyim için <strong>telefonu yan çevirin</strong></span>
-    ${
-      dismissible
-        ? `<button type="button" class="rotate-hint__close" aria-label="Uyarıyı kapat">×</button>`
-        : ""
-    }
   `;
+  if (isTouch) parent.appendChild(el);
+
+  let intervalId: number | null = null;
+  let hideTimeoutId: number | null = null;
+  let initialTimeoutId: number | null = null;
+
+  function isPortrait(): boolean {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+      return false;
+    return window.matchMedia("(orientation: portrait)").matches;
+  }
+
+  function clearHideTimeout(): void {
+    if (hideTimeoutId !== null) {
+      window.clearTimeout(hideTimeoutId);
+      hideTimeoutId = null;
+    }
+  }
+
+  function hideNow(): void {
+    clearHideTimeout();
+    el.classList.remove("is-visible");
+  }
+
+  function show(): void {
+    /** Yatayda hiç gösterme — kullanıcı zaten doğru konumda. */
+    if (!isPortrait()) {
+      hideNow();
+      return;
+    }
+    clearHideTimeout();
+    el.classList.add("is-visible");
+    hideTimeoutId = window.setTimeout(() => {
+      el.classList.remove("is-visible");
+      hideTimeoutId = null;
+    }, visibleMs);
+  }
 
   /**
-   * sessionStorage'da kapatma durumu saklanır — kütüphaneden deneyime
-   * geçişte uyarı yeniden fırlayıp kullanıcıyı rahatsız etmesin.
+   * Orientation değişiminde anında tepki ver — yatay moda dönülürse
+   * banner görünür durumda kalmasın.
    */
-  const STORAGE_KEY = "audioroom:rotate-hint-dismissed";
-  let dismissed = false;
-  try {
-    dismissed = window.sessionStorage?.getItem(STORAGE_KEY) === "1";
-  } catch {
-    /* private modda sessionStorage throw edebilir — sessizce yoksay. */
-  }
-
+  const onOrientationChange = (): void => {
+    if (!isPortrait()) hideNow();
+  };
   let mql: MediaQueryList | null = null;
-  let onChange: (() => void) | null = null;
-
-  function update(): void {
-    const isPortrait =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(orientation: portrait)").matches;
-    const shouldShow = isTouch && isPortrait && !dismissed;
-    el.classList.toggle("is-visible", shouldShow);
-    /** Yatayken pointer-events'i kapat — kazara tıklanma olmasın. */
-    el.style.pointerEvents = shouldShow ? "auto" : "none";
-  }
-
-  const closeBtn = el.querySelector<HTMLButtonElement>(".rotate-hint__close");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      dismissed = true;
-      try {
-        window.sessionStorage?.setItem(STORAGE_KEY, "1");
-      } catch {
-        /* noop */
-      }
-      update();
-    });
-  }
 
   return {
-    attach() {
+    start() {
       if (!isTouch) return;
-      if (!el.isConnected) parent.appendChild(el);
-      /**
-       * Orientation değişimini dinle. matchMedia daha güvenilir; iOS Safari
-       * klasik `orientationchange`'i geç yangılar. İkisini de dinliyoruz.
-       */
+      if (intervalId !== null) return;
+      initialTimeoutId = window.setTimeout(show, initialDelayMs);
+      intervalId = window.setInterval(show, intervalMs);
+      /** Orientation değişimlerini dinle — yatay olunca anında gizle. */
       if (typeof window.matchMedia === "function") {
         mql = window.matchMedia("(orientation: portrait)");
-        onChange = () => update();
         if (typeof mql.addEventListener === "function") {
-          mql.addEventListener("change", onChange);
+          mql.addEventListener("change", onOrientationChange);
         } else if (typeof mql.addListener === "function") {
-          mql.addListener(onChange);
+          mql.addListener(onOrientationChange);
         }
       }
-      window.addEventListener("resize", update, { passive: true });
-      window.addEventListener("orientationchange", update, { passive: true });
-      update();
+    },
+    stop() {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+      if (initialTimeoutId !== null) {
+        window.clearTimeout(initialTimeoutId);
+        initialTimeoutId = null;
+      }
+      hideNow();
+      if (mql) {
+        if (typeof mql.removeEventListener === "function") {
+          mql.removeEventListener("change", onOrientationChange);
+        } else if (typeof mql.removeListener === "function") {
+          mql.removeListener(onOrientationChange);
+        }
+        mql = null;
+      }
     },
     dispose() {
-      if (mql && onChange) {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      if (initialTimeoutId !== null) window.clearTimeout(initialTimeoutId);
+      clearHideTimeout();
+      if (mql) {
         if (typeof mql.removeEventListener === "function") {
-          mql.removeEventListener("change", onChange);
+          mql.removeEventListener("change", onOrientationChange);
         } else if (typeof mql.removeListener === "function") {
-          mql.removeListener(onChange);
+          mql.removeListener(onOrientationChange);
         }
+        mql = null;
       }
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
       el.remove();
     },
   };
