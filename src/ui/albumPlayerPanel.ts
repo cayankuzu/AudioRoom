@@ -60,6 +60,8 @@ interface YTPlayer {
   getPlaylist(): string[] | null | undefined;
   getPlaylistIndex(): number;
   getPlayerState(): YTPlayerState;
+  seekTo(seconds: number, allowSeekAhead?: boolean): void;
+  getCurrentTime(): number;
   destroy(): void;
 }
 
@@ -81,6 +83,8 @@ export interface AlbumPlayerPanel {
   playOrder(order: number): void;
   /** Oynatılanı duraklat / duraklatılanı devam ettir. */
   togglePlayback(): void;
+  /** Aktif parçayı baştan yeniden çalıştır. */
+  restart(): void;
   /** Panel'deki aktif track (canonical order, 0 = yok). */
   activeOrder(): number;
   dispose(): void;
@@ -188,6 +192,9 @@ export function createAlbumPlayerPanel(
         <button class="album-panel__btn" data-action="next" type="button" aria-label="Sonraki parça" title="Sonraki">
           <span aria-hidden="true">⏭</span>
         </button>
+        <button class="album-panel__btn" data-action="restart" type="button" aria-label="Baştan çal" title="Baştan çal">
+          <span aria-hidden="true">↺</span>
+        </button>
         <button class="album-panel__btn" data-action="mute" type="button" aria-label="Sesi aç / kıs" title="Sustur">
           <span aria-hidden="true">🔊</span>
         </button>
@@ -214,6 +221,7 @@ export function createAlbumPlayerPanel(
   const toggleBtn = shell.querySelector<HTMLButtonElement>('[data-action="toggle"]');
   const prevBtn = shell.querySelector<HTMLButtonElement>('[data-action="prev"]');
   const nextBtn = shell.querySelector<HTMLButtonElement>('[data-action="next"]');
+  const restartBtn = shell.querySelector<HTMLButtonElement>('[data-action="restart"]');
   const muteBtn = shell.querySelector<HTMLButtonElement>('[data-action="mute"]');
   const volumeInput = shell.querySelector<HTMLInputElement>(".album-panel__volume input");
   const collapseBtn = shell.querySelector<HTMLButtonElement>(".album-panel__collapse");
@@ -228,6 +236,7 @@ export function createAlbumPlayerPanel(
     !toggleBtn ||
     !prevBtn ||
     !nextBtn ||
+    !restartBtn ||
     !muteBtn ||
     !volumeInput ||
     !collapseBtn ||
@@ -649,7 +658,11 @@ export function createAlbumPlayerPanel(
             }
           }
 
-          /** Bir parça bittiğinde yalnızca TOPLANMIŞ sıradaki sonraki parçaya geç. */
+          /**
+           * Bir parça bittiğinde:
+           * - envanterde SIRADAKİ toplanmış parça varsa otomatik ona geç,
+           * - yoksa TAMAMEN DUR (pause + playing=false).
+           */
           if (state === 0) {
             const cur = playbackState.currentCanonical;
             const nxt = findNextCollected(cur, 1);
@@ -657,6 +670,7 @@ export function createAlbumPlayerPanel(
               console.log(LOG, "Parça bitti — canonical next", { from: cur, to: nxt });
               void playCanonical(nxt);
             } else {
+              console.log(LOG, "Parça bitti — başka plak yok, oynatma durdu.");
               updatePlayingUi(false);
               safeCall(() => player!.pauseVideo(), undefined);
             }
@@ -714,6 +728,50 @@ export function createAlbumPlayerPanel(
     if (inventory.activeOrder <= 0) return;
     nextCanonical();
   });
+
+  /**
+   * Yeniden oynat — mevcut parçayı 0'dan başlatır.
+   * Eğer hiçbir parça aktif değilse (plak takılı değil) hiçbir şey yapmaz.
+   */
+  const restartCurrent = (): void => {
+    if (!player || !playbackState.ready) return;
+    hideFallback();
+
+    /** Önce envanterde takılı plak varsa onu tercih et. */
+    const activeOrder = inventory.activeOrder;
+    if (activeOrder > 0 && inventory.has(activeOrder)) {
+      const idx = uiState.tracks.findIndex((t) => t.order === activeOrder);
+      if (idx >= 0) {
+        const track = uiState.tracks[idx];
+        if (track.ytIndex >= 0) {
+          const liveYt = safeCall(() => player!.getPlaylistIndex(), -1);
+          if (liveYt === track.ytIndex) {
+            console.log(LOG, "Restart — seekTo(0)", { order: track.order });
+            safeCall(() => player!.unMute(), undefined);
+            updateMuteUi(false);
+            applyEffectiveVolume();
+            safeCall(() => player!.seekTo(0, true), undefined);
+            safeCall(() => player!.playVideo(), undefined);
+            return;
+          }
+        }
+        void playCanonical(idx);
+        return;
+      }
+    }
+
+    /** Envanterde aktif plak yoksa — panelde son oynatılan canonical parçayı baştan aç. */
+    const curCanonical = playbackState.currentCanonical;
+    const t = uiState.tracks[curCanonical];
+    if (!t) return;
+    if (!inventory.has(t.order)) {
+      console.log(LOG, "Restart reddedildi — bu parçanın plağı envanterde yok.");
+      return;
+    }
+    void playCanonical(curCanonical);
+  };
+
+  restartBtn.addEventListener("click", restartCurrent);
 
   muteBtn.addEventListener("click", () => {
     if (!player || !playbackState.ready) return;
@@ -846,6 +904,7 @@ export function createAlbumPlayerPanel(
     refreshInventory,
     playOrder,
     togglePlayback,
+    restart: restartCurrent,
     activeOrder: () =>
       playbackState.playing ? playbackState.currentCanonical + 1 : 0,
     dispose() {
