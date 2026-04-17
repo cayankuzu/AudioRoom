@@ -8,58 +8,57 @@ export interface FootprintSystem {
 }
 
 /**
- * Ayak izi dokusu — koyu siyah arazide görünmesi için AÇIK renk (toz
- * bozunması) katmanlar.
- *
- *  - Dış oval: açık bej yığıntı hissi (sürtünen kum).
- *  - Orta: hafif daha koyu gölge (topuk basıncı).
- *  - Parmak uçları: küçük açık noktalar.
+ * Ayak izi dokusu — siyah kum / toz zeminde net görünmesi için AÇIK kum
+ * bozunması + belirgin kontrast. Daha önce izler zayıf görünüyordu; bu
+ * sürümde opaklık ve kontrast artırıldı ve kenarlar yumuşak tutuldu.
  */
 function createFootprintTexture(): THREE.Texture {
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 192;
+  canvas.height = 192;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     return new THREE.CanvasTexture(canvas);
   }
-  ctx.clearRect(0, 0, 128, 128);
+  ctx.clearRect(0, 0, 192, 192);
 
-  /** Dış halo — açık kum bozunması. */
-  const halo = ctx.createRadialGradient(64, 64, 10, 64, 64, 60);
-  halo.addColorStop(0, "rgba(210, 198, 174, 0.88)");
-  halo.addColorStop(0.55, "rgba(160, 149, 128, 0.58)");
+  /** Dış halo — açık kum bozunması (izin dış çeperi). */
+  const halo = ctx.createRadialGradient(96, 96, 14, 96, 96, 92);
+  halo.addColorStop(0, "rgba(228, 218, 196, 0.95)");
+  halo.addColorStop(0.45, "rgba(184, 172, 148, 0.78)");
+  halo.addColorStop(0.85, "rgba(140, 128, 106, 0.18)");
   halo.addColorStop(1, "rgba(140, 128, 106, 0)");
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.ellipse(64, 64, 34, 56, 0, 0, Math.PI * 2);
+  ctx.ellipse(96, 96, 52, 86, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  /** İç gölge — topuk basıncı. */
-  const shadow = ctx.createRadialGradient(64, 78, 2, 64, 78, 22);
-  shadow.addColorStop(0, "rgba(20, 16, 12, 0.55)");
-  shadow.addColorStop(1, "rgba(20, 16, 12, 0)");
+  /** İç gölge — topuk basıncı (kumda oluşan küçük çukur). */
+  const shadow = ctx.createRadialGradient(96, 118, 3, 96, 118, 34);
+  shadow.addColorStop(0, "rgba(14, 10, 8, 0.72)");
+  shadow.addColorStop(1, "rgba(14, 10, 8, 0)");
   ctx.fillStyle = shadow;
   ctx.beginPath();
-  ctx.ellipse(64, 78, 18, 24, 0, 0, Math.PI * 2);
+  ctx.ellipse(96, 118, 27, 38, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const dot = (cx: number, cy: number, r: number, a: number) => {
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(220, 208, 184, ${a})`);
-    g.addColorStop(1, "rgba(220, 208, 184, 0)");
+    g.addColorStop(0, `rgba(232, 220, 196, ${a})`);
+    g.addColorStop(1, "rgba(232, 220, 196, 0)");
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   };
-  dot(64, 28, 10, 0.78);
-  dot(52, 42, 6.5, 0.58);
-  dot(76, 42, 6.5, 0.58);
+  /** Parmak uçları — daha belirgin. */
+  dot(96, 40, 15, 0.92);
+  dot(76, 60, 10, 0.74);
+  dot(116, 60, 10, 0.74);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -87,6 +86,9 @@ export function createFootprintSystem(): FootprintSystem {
   /** Shared material — instance başına clone edilir (opacity bağımsız fade için).
    *  `toneMapped: false` → tone mapping izini koyulaştırmasın, görünür kalsın.
    *  `depthWrite: false` + polygonOffset → z-fight/gömülme olmaz.
+   *  NOT: polygonOffsetFactor pozitif yapıldı — izleri kameraya yaklaştırır,
+   *  terrain'in içine kaybolmasını engeller (önceki `-2` değeri bazı
+   *  yamaçlarda izin zeminin arkasında kalmasına yol açıyordu).
    */
   function makeMaterial(): THREE.MeshBasicMaterial {
     return new THREE.MeshBasicMaterial({
@@ -94,10 +96,12 @@ export function createFootprintSystem(): FootprintSystem {
       transparent: true,
       opacity: FOOTPRINT.opacity,
       depthWrite: false,
+      depthTest: true,
       toneMapped: false,
       polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -6,
+      fog: false,
     });
   }
 
@@ -184,15 +188,22 @@ export function createFootprintSystem(): FootprintSystem {
 
       quat.setFromUnitVectors(up, normal);
 
-      mesh.position.set(fx, fy + 0.08, fz);
+      /**
+       * Y-ofset'i terrain üstünde güvenli bir miktar yüksek tut — çok küçük
+       * mikro yükseklik farkları yüzünden izler kaybolmasın. Doku hafif
+       * yukarıda olsa bile polygonOffset sayesinde zemine yapışık görünür.
+       */
+      mesh.position.set(fx, fy + 0.035, fz);
       mesh.quaternion.copy(quat);
       /** Yaw rotasyonu — izler oyuncunun gittiği yöne baksın. */
       mesh.rotateY(pose.yaw);
-      /** Hafif boyut varyasyonu — robotik görünmesin. */
-      const scale = 0.92 + Math.random() * 0.14;
+      /** Hafif boyut varyasyonu + koşuda biraz daha büyük iz. */
+      const sprintBoost = pose.speed > PLAYER.walkSpeed + 0.2 ? 1.08 : 1;
+      const scale = (0.95 + Math.random() * 0.12) * sprintBoost;
       mesh.scale.setScalar(scale);
       /** Her zaman terrain'in üzerine çizilsin. */
-      mesh.renderOrder = 1;
+      mesh.renderOrder = 2;
+      mesh.frustumCulled = true;
 
       object.add(mesh);
       prints.push({ mesh, age: 0 });

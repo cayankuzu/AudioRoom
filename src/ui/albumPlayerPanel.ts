@@ -1,7 +1,6 @@
 import { ALBUM } from "../config/config";
 import {
   CANONICAL_TRACKS,
-  fillUnmatched,
   normalizeTitle,
   resolvePlaylistMapping,
 } from "../data/trackLibrary";
@@ -62,6 +61,7 @@ interface YTPlayer {
   getPlayerState(): YTPlayerState;
   seekTo(seconds: number, allowSeekAhead?: boolean): void;
   getCurrentTime(): number;
+  getDuration(): number;
   destroy(): void;
 }
 
@@ -181,6 +181,18 @@ export function createAlbumPlayerPanel(
           <a href="${ALBUM.playlistUrl}" target="_blank" rel="noopener">YouTube'da aç</a>
         </div>
       </div>
+      <div class="album-panel__progress" data-progress>
+        <div class="album-panel__progress-times">
+          <span class="album-panel__time" data-time-current>0:00</span>
+          <span class="album-panel__time album-panel__time--total" data-time-total>0:00</span>
+        </div>
+        <div class="album-panel__bar" data-bar role="slider"
+             aria-label="Parça ilerlemesi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="album-panel__bar-track"></div>
+          <div class="album-panel__bar-fill" data-bar-fill></div>
+          <div class="album-panel__bar-handle" data-bar-handle></div>
+        </div>
+      </div>
       <div class="album-panel__controls">
         <button class="album-panel__btn" data-action="prev" type="button" aria-label="Önceki parça" title="Önceki">
           <span aria-hidden="true">⏮</span>
@@ -191,6 +203,9 @@ export function createAlbumPlayerPanel(
         </button>
         <button class="album-panel__btn" data-action="next" type="button" aria-label="Sonraki parça" title="Sonraki">
           <span aria-hidden="true">⏭</span>
+        </button>
+        <button class="album-panel__btn" data-action="stop" type="button" aria-label="Durdur" title="Durdur">
+          <span aria-hidden="true">■</span>
         </button>
         <button class="album-panel__btn" data-action="restart" type="button" aria-label="Baştan çal" title="Baştan çal">
           <span aria-hidden="true">↺</span>
@@ -221,8 +236,14 @@ export function createAlbumPlayerPanel(
   const toggleBtn = shell.querySelector<HTMLButtonElement>('[data-action="toggle"]');
   const prevBtn = shell.querySelector<HTMLButtonElement>('[data-action="prev"]');
   const nextBtn = shell.querySelector<HTMLButtonElement>('[data-action="next"]');
+  const stopBtn = shell.querySelector<HTMLButtonElement>('[data-action="stop"]');
   const restartBtn = shell.querySelector<HTMLButtonElement>('[data-action="restart"]');
   const muteBtn = shell.querySelector<HTMLButtonElement>('[data-action="mute"]');
+  const barEl = shell.querySelector<HTMLDivElement>('[data-bar]');
+  const barFill = shell.querySelector<HTMLDivElement>('[data-bar-fill]');
+  const barHandle = shell.querySelector<HTMLDivElement>('[data-bar-handle]');
+  const timeCurrent = shell.querySelector<HTMLSpanElement>('[data-time-current]');
+  const timeTotal = shell.querySelector<HTMLSpanElement>('[data-time-total]');
   const volumeInput = shell.querySelector<HTMLInputElement>(".album-panel__volume input");
   const collapseBtn = shell.querySelector<HTMLButtonElement>(".album-panel__collapse");
   const fallback = shell.querySelector<HTMLDivElement>(".album-panel__fallback");
@@ -236,6 +257,7 @@ export function createAlbumPlayerPanel(
     !toggleBtn ||
     !prevBtn ||
     !nextBtn ||
+    !stopBtn ||
     !restartBtn ||
     !muteBtn ||
     !volumeInput ||
@@ -243,7 +265,12 @@ export function createAlbumPlayerPanel(
     !fallback ||
     !fallbackBtn ||
     !listEl ||
-    !countEl
+    !countEl ||
+    !barEl ||
+    !barFill ||
+    !barHandle ||
+    !timeCurrent ||
+    !timeTotal
   ) {
     throw new Error("Album panel DOM eksik");
   }
@@ -337,13 +364,23 @@ export function createAlbumPlayerPanel(
       const canonicalIndex = track.order - 1;
       const active = canonicalIndex === playbackState.currentCanonical && playbackState.playing;
       const collected = inventory.has(track.order);
+      const loaded = inventory.activeOrder === track.order && collected;
       li.setAttribute("aria-selected", active ? "true" : "false");
       if (active) li.classList.add("is-active");
+      if (loaded && !active) li.classList.add("is-loaded");
       if (!collected) li.classList.add("is-missing");
       else if (track.ytIndex < 0) li.classList.add("is-pending");
 
       const titleText = collected ? track.title : MISSING_TEXT;
-      const stateIcon = active ? "♪" : !collected ? "✕" : track.ytIndex < 0 ? "…" : "";
+      const stateIcon = active
+        ? "♪"
+        : loaded
+          ? "◉"
+          : !collected
+            ? "✕"
+            : track.ytIndex < 0
+              ? "…"
+              : "";
       li.innerHTML = `
         <span class="album-panel__track-index">${String(track.order).padStart(2, "0")}</span>
         <span class="album-panel__track-title">${escapeHtml(titleText)}</span>
@@ -365,35 +402,54 @@ export function createAlbumPlayerPanel(
     items.forEach((item) => {
       const o = Number(item.dataset.order);
       const active = o - 1 === playbackState.currentCanonical && playbackState.playing;
+      const collected = inventory.has(o);
+      const loaded = inventory.activeOrder === o && collected;
       item.classList.toggle("is-active", active);
+      item.classList.toggle("is-loaded", loaded && !active);
       item.setAttribute("aria-selected", active ? "true" : "false");
       const state = item.querySelector<HTMLSpanElement>(".album-panel__track-state");
       if (state) {
         const t = uiState.tracks.find((tr) => tr.order === o);
-        const collected = inventory.has(o);
         state.textContent = active
           ? "♪"
-          : !collected
-            ? "✕"
-            : t && t.ytIndex < 0
-              ? "…"
-              : "";
+          : loaded
+            ? "◉"
+            : !collected
+              ? "✕"
+              : t && t.ytIndex < 0
+                ? "…"
+                : "";
       }
     });
-    const activeItem = listEl!.querySelector<HTMLLIElement>(".album-panel__track.is-active");
+    const activeItem = listEl!.querySelector<HTMLLIElement>(
+      ".album-panel__track.is-active, .album-panel__track.is-loaded",
+    );
     activeItem?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function updateHeaderTitle(): void {
-    const order = playbackState.currentCanonical + 1;
-    if (!inventory.has(order) || playbackState.currentCanonical < 0) {
-      titleEl!.textContent = "Hiçbir plak takılı değil";
-      return;
+    /**
+     * Öncelik: (1) canlı çalan parça, (2) gramofonda takılı plak,
+     * (3) "Hiçbir plak takılı değil".
+     */
+    if (playbackState.playing && playbackState.currentCanonical >= 0) {
+      const order = playbackState.currentCanonical + 1;
+      if (inventory.has(order)) {
+        const t = uiState.tracks.find((tr) => tr.order === order);
+        if (t) {
+          titleEl!.textContent = t.title;
+          return;
+        }
+      }
     }
-    const t = uiState.tracks.find((tr) => tr.order === order);
-    if (t) {
-      titleEl!.textContent = t.title;
+    if (inventory.activeOrder > 0) {
+      const t = uiState.tracks.find((tr) => tr.order === inventory.activeOrder);
+      if (t) {
+        titleEl!.textContent = t.title;
+        return;
+      }
     }
+    titleEl!.textContent = "Hiçbir plak takılı değil";
   }
 
   function hideFallback(): void {
@@ -437,11 +493,22 @@ export function createAlbumPlayerPanel(
     if (ids.length === 0) return;
 
     const rawTitlesByIndex = ids.map((id) => playlistState.rawTitles.get(id) ?? "");
+    /**
+     * SADECE fuzzy match ile eşleşmiş olanları kullan. `fillUnmatched`
+     * canonical sıralamaya ait OLMAYAN YouTube videolarını rastgele
+     * canonical slot'lara atayabiliyor (albüm dışı parçalar, remix'ler,
+     * röportajlar…) — bu da "listede olmayan şarkılar çalıyor"
+     * sorununa yol açar. Bu yüzden dolguyu KALDIRIYORUZ: eşleşmeyen
+     * canonical'ın `ytIndex` değeri -1 kalır ve hiç çalınmaz.
+     *
+     * Ayrıca: tüm başlıklar daha hidrate olmadan (rawTitles az) EARLY
+     * ÇAĞRI'da yanlış eşleşmeleri önlemek için eşik (`MIN_TITLES_FOR_FINALIZE`)
+     * geçilene kadar "geçici" olarak bırakırız.
+     */
     const primaryMapping = resolvePlaylistMapping(rawTitlesByIndex);
-    const finalMapping = fillUnmatched(primaryMapping, ids.length);
 
     uiState.tracks = CANONICAL_TRACKS.map<DisplayTrack>((ct) => {
-      const ytIndex = finalMapping[ct.order - 1];
+      const ytIndex = primaryMapping[ct.order - 1];
       return {
         order: ct.order,
         title: ct.title,
@@ -631,6 +698,37 @@ export function createAlbumPlayerPanel(
           console.log(LOG, "Durum değişti", { state });
           captureYtIdsFromPlayer();
 
+          /**
+           * KRİTİK GUARD — Her çalma/buffer durumu değişiminde:
+           * YouTube'un o an yüklü olduğu video REALLY canonical listeye
+           * dahil mi VE oyuncunun plağı var mı? Değilse anında durdur.
+           *
+           * Bu; YT playlist'in albüm dışı (remix, röportaj, fazlalık)
+           * videolara otomatik geçmesini, parça sonrası beklenmeyen
+           * auto-advance'i ve canonical mapping'de yeri olmayan bir
+           * index'i sessizce engeller.
+           */
+          if (state === 1 || state === 3) {
+            const liveYt = safeCall(() => player!.getPlaylistIndex(), -1);
+            const canonical =
+              liveYt >= 0 ? uiState.tracks.findIndex((t) => t.ytIndex === liveYt) : -1;
+            const canonicalOrder = canonical >= 0 ? uiState.tracks[canonical].order : -1;
+            const hasRecord = canonicalOrder > 0 && inventory.has(canonicalOrder);
+
+            if (canonical < 0 || !hasRecord) {
+              console.log(
+                LOG,
+                "Engellendi — yüklü video canonical listede yok veya plak yok.",
+                { liveYt, canonical, canonicalOrder },
+              );
+              safeCall(() => player!.pauseVideo(), undefined);
+              safeCall(() => player!.mute(), undefined);
+              updateMuteUi(true);
+              updatePlayingUi(false);
+              return;
+            }
+          }
+
           if (state === 1) {
             hideFallback();
             updatePlayingUi(true);
@@ -773,6 +871,75 @@ export function createAlbumPlayerPanel(
 
   restartBtn.addEventListener("click", restartCurrent);
 
+  /** --- Stop butonu: oynatmayı tamamen durdur ve baştan al. --- */
+  stopBtn.addEventListener("click", () => {
+    if (!player || !playbackState.ready) return;
+    safeCall(() => player!.pauseVideo(), undefined);
+    safeCall(() => player!.seekTo(0, true), undefined);
+    updatePlayingUi(false);
+    setProgress(0, getKnownDuration());
+  });
+
+  /** --- İlerleme çubuğu --- */
+  let knownDuration = 0;
+  function getKnownDuration(): number {
+    if (!player || !playbackState.ready) return knownDuration;
+    const d = safeCall(() => player!.getDuration(), 0);
+    if (d && Number.isFinite(d) && d > 0) knownDuration = d;
+    return knownDuration;
+  }
+
+  function formatTime(s: number): string {
+    if (!Number.isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  }
+
+  function setProgress(current: number, duration: number): void {
+    const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+    barFill!.style.width = `${pct}%`;
+    barHandle!.style.left = `${pct}%`;
+    barEl!.setAttribute("aria-valuenow", String(Math.round(pct)));
+    timeCurrent!.textContent = formatTime(current);
+    timeTotal!.textContent = formatTime(duration);
+  }
+
+  /** 4Hz poll — YouTube iframe için yeterli ve ucuz. */
+  const progressTimer = window.setInterval(() => {
+    if (!player || !playbackState.ready) return;
+    const cur = safeCall(() => player!.getCurrentTime(), 0);
+    const dur = getKnownDuration();
+    setProgress(cur, dur);
+  }, 250);
+
+  /** Barı tıklanabilir / sürüklenebilir yap. */
+  function seekFromEvent(clientX: number): void {
+    if (!player || !playbackState.ready) return;
+    const dur = getKnownDuration();
+    if (dur <= 0) return;
+    const rect = barEl!.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    safeCall(() => player!.seekTo(pct * dur, true), undefined);
+    setProgress(pct * dur, dur);
+  }
+  let scrubbing = false;
+  barEl.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    scrubbing = true;
+    seekFromEvent(e.clientX);
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!scrubbing) return;
+    seekFromEvent(e.clientX);
+  });
+  window.addEventListener("mouseup", () => {
+    scrubbing = false;
+  });
+  /** Pointer-lock'u çalmasın. */
+  barEl.addEventListener("click", (e) => e.stopPropagation());
+
   muteBtn.addEventListener("click", () => {
     if (!player || !playbackState.ready) return;
     if (playbackState.muted) {
@@ -908,6 +1075,7 @@ export function createAlbumPlayerPanel(
     activeOrder: () =>
       playbackState.playing ? playbackState.currentCanonical + 1 : 0,
     dispose() {
+      window.clearInterval(progressTimer);
       player?.destroy();
       shell.remove();
     },

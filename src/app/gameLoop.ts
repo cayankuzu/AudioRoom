@@ -23,7 +23,15 @@ import { createFootprintSystem } from "../systems/footprintSystem";
 import { createFlashlightSystem } from "../systems/flashlightSystem";
 import { createAudioDistanceSystem } from "../systems/audioDistanceSystem";
 import { createInteractionSystem } from "../systems/interactionSystem";
+import { createWindSystem } from "../systems/windSystem";
+import { bucketInstancedMeshes } from "../systems/worldStreaming";
+import {
+  createRng,
+  pickGramophoneSpawn,
+  resolveSessionSeed,
+} from "../systems/spawnSystem";
 
+import { createAmbientAudio } from "../audio/ambientAudio";
 import { createInventory } from "../state/inventory";
 
 import { createStartOverlay } from "../ui/startOverlay";
@@ -34,10 +42,13 @@ import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 
 export function startExperience(container: HTMLElement): void {
+  /** --- Oturum bazlı seed: her yüklemede dünya farklı ama mantıklı dizilir. --- */
+  const sessionSeed = resolveSessionSeed();
+  console.log("[Session]", "seed =", sessionSeed);
+
   const scene = createScene();
   const camera = createCamera();
   const renderer = createRenderer(container);
-  /** Kameraya bağlı fener/child objelerin sahneye dahil olabilmesi için. */
   scene.add(camera);
   const lights = addLights(scene);
   scene.add(createSky());
@@ -47,6 +58,21 @@ export function startExperience(container: HTMLElement): void {
 
   const rocks = createRocks(terrain.getHeightAt);
   scene.add(rocks.group);
+
+  /**
+   * --- World streaming / LOD ---
+   * Büyük InstancedMesh'leri uzaysal hücrelere böler; Three.js frustum
+   * culling artık gerçekten çalışır. Ayrıca uzak küçük kategoriler
+   * otomatik olarak gölge pass'inden düşer.
+   */
+  const worldStreaming = bucketInstancedMeshes(rocks.group, {
+    cellSize: 40,
+    smallShadowCullDistance: 55,
+  });
+  console.log(
+    "[Streaming]",
+    `bucketed ${worldStreaming.bucketedMeshCount} meshes → ${worldStreaming.bucketCount} cells`,
+  );
 
   const atmosphere = createAtmosphere();
   scene.add(atmosphere.object);
@@ -62,29 +88,42 @@ export function startExperience(container: HTMLElement): void {
   const figure = createFigure(scene, compositionGroup, terrain.getHeightAt, lights);
   const text3d = createText3D(compositionGroup, terrain.getHeightAt);
 
-  /** --- İnventory ve plak sistemi --- */
+  /** --- İnventory ve rüzgar sistemleri --- */
   const inventory = createInventory();
-
-  const viewer = new THREE.Vector2(
-    -PLAYER.startPosition.x,
-    -PLAYER.startPosition.z,
-  ).normalize();
-
-  const vinylSystem = createVinylSystem(terrain.getHeightAt, inventory, viewer);
-  scene.add(vinylSystem.root);
+  const wind = createWindSystem();
+  const ambient = createAmbientAudio();
 
   /**
-   * Gramofonu oyuncu başlangıcının biraz ilerisine yerleştir — oyuncu sahneye
-   * uyanır uyanmaz onu görür. Y koordinatı gramofon modülünün içinde doğru
-   * ground padding ile yeniden hesaplanır; buradaki +0.05 sadece placeholder.
+   * --- Gramofon için seeded random konum ---
+   * Oyuncu başlangıç pozisyonuna göre anlamlı ön planda, dik yamaçta değil,
+   * krater merkezine dalmayacak şekilde seçilir.
    */
-  const gramInit = new THREE.Vector3(
-    PLAYER.startPosition.x * 0.72,
-    0,
-    PLAYER.startPosition.z * 0.72,
-  );
-  gramInit.y = terrain.getHeightAt(gramInit.x, gramInit.z) + 0.05;
-  const gramophone = createGramophone(scene, camera, gramInit);
+  const gramRng = createRng(sessionSeed ^ 0x9e3779b1);
+  const gramPosInit = pickGramophoneSpawn({
+    rand: gramRng,
+    playerStart: { x: PLAYER.startPosition.x, z: PLAYER.startPosition.z },
+    getHeightAt: terrain.getHeightAt,
+    minFromPlayer: 10,
+    maxFromPlayer: 26,
+    minFromCenter: WORLD.craterRimRadius - 12,
+    maxSlope: 0.55,
+  });
+  const gramophone = createGramophone(scene, camera, gramPosInit);
+
+  /**
+   * --- Plak yerleşimi ---
+   * Gramofon ve oyuncu başlangıcı avoid bölgesi olarak verilir;
+   * böylece plaklar onların üstüne denk gelmez.
+   */
+  const vinylSystem = createVinylSystem(terrain.getHeightAt, inventory, {
+    seed: sessionSeed,
+    avoid: [
+      { x: gramPosInit.x, z: gramPosInit.z, radius: 5 },
+      { x: PLAYER.startPosition.x, z: PLAYER.startPosition.z, radius: 8 },
+      { x: WORLD.craterCenter.x, z: WORLD.craterCenter.z, radius: 7 },
+    ],
+  });
+  scene.add(vinylSystem.root);
 
   const collisions = createCollisionSystem();
   collisions.add(rocks.colliders);
@@ -102,6 +141,7 @@ export function startExperience(container: HTMLElement): void {
   }
 
   const cameraMotion = createCameraMotion();
+  cameraMotion.setWind(wind.state);
 
   const footprints = createFootprintSystem();
   scene.add(footprints.object);
@@ -126,8 +166,6 @@ export function startExperience(container: HTMLElement): void {
       console.log("[Plak]", `Toplandı → order=${order} "${spawn.title}"`);
       /**
        * KURAL: Müzik SADECE plak gramofona TAKILDIĞINDA başlar.
-       * Burada otomatik oynatma YOK — sadece envanter güncelleniyor.
-       * Oyuncu gramofona gidip E'ye basınca çalmaya başlar.
        */
       albumPanel.refreshInventory();
     },
@@ -139,14 +177,10 @@ export function startExperience(container: HTMLElement): void {
        */
       if (gramophone.activeOrder === 0) {
         const first = Array.from(inventory.collected).sort((a, b) => a - b)[0];
-        if (first === undefined) {
-          /** Envanterde de plak yok — hiçbir şey olmaz. */
-          return;
-        }
+        if (first === undefined) return;
         gramophone.setActive(first);
         albumPanel.playOrder(first);
       } else {
-        /** Plak zaten takılı → toggle play/pause. */
         albumPanel.togglePlayback();
       }
     },
@@ -169,10 +203,6 @@ export function startExperience(container: HTMLElement): void {
   };
   document.addEventListener("keydown", onKeyDown);
 
-  /**
-   * Envanter aktif plağı değiştiğinde gramofonun görsel plak slot'unu senkronize et.
-   * Böylece panelden seçim de gramofona yansır (tek doğruluk kaynağı = inventory).
-   */
   inventory.onChange((snap) => {
     if (gramophone.activeOrder !== snap.activeOrder) {
       gramophone.setActive(snap.activeOrder);
@@ -180,21 +210,18 @@ export function startExperience(container: HTMLElement): void {
   });
 
   startOverlay.onStart(() => {
-    /**
-     * İlk user-gesture — sadece pointer-lock. Müzik başlatma KESİNLİKLE yok.
-     * Oyuncu plak bulup gramofona takmadıkça ses çıkmaz.
-     */
     input.requestLock();
+    /**
+     * İlk user-gesture — WebAudio AudioContext'i ayağa kaldırılabilir.
+     * Müzik değil, yalnızca ortam rüzgarı. Çok düşük seviye.
+     */
+    ambient.start();
   });
   input.onLockChange((locked) => {
     if (locked) startOverlay.hide();
     else startOverlay.show();
   });
 
-  /**
-   * Canvas tıklaması — overlay açıkken zaten overlay yutar; değilse yalnızca
-   * pointer-lock'u tekrar talep eder. Ses hiçbir koşulda burada başlamaz.
-   */
   renderer.domElement.addEventListener("click", () => {
     if (!startOverlay.isVisible()) {
       input.requestLock();
@@ -211,18 +238,15 @@ export function startExperience(container: HTMLElement): void {
   const clock = new THREE.Clock();
   const gramPos = new THREE.Vector3();
 
-  /** Interaction hedef listesi — vinyl gruplar + gramofon hit küresi. */
   function collectInteractables(): THREE.Object3D[] {
     const list: THREE.Object3D[] = [];
     for (const s of vinylSystem.spawns) {
       if (s.group.visible) list.push(s.group);
     }
-    /** Taşınırken gramofon kendi hit-küresine etkileşim algılatmaz. */
     if (gramophone.state === "placed") list.push(gramophone.interactTarget);
     return list;
   }
 
-  /** Gramofon prompt'unu mevcut duruma göre her frame güncelle. */
   function refreshGramophonePrompt(): void {
     const ud = gramophone.interactTarget.userData as {
       interactable?: { promptKey: string; promptText: string };
@@ -244,11 +268,15 @@ export function startExperience(container: HTMLElement): void {
     const delta = Math.min(clock.getDelta(), 0.033);
     const time = clock.elapsedTime;
 
+    /** Rüzgar her zaman güncellenir — atmosfer, kamera ve ambient bundan besleniyor. */
+    wind.update(time, delta);
+
     const pose = movement.update(delta, terrain.getHeightAt);
     cameraMotion.apply(camera, pose, time, delta);
 
     footprints.update(delta, pose, terrain.getHeightAt);
-    atmosphere.update(time);
+    atmosphere.update(time, wind.state);
+    ambient.update(wind.state, delta);
 
     /** TEK rotasyon kaynağı. */
     compositionGroup.rotation.y += ROTATION.composition * delta;
@@ -259,7 +287,6 @@ export function startExperience(container: HTMLElement): void {
     vinylSystem.update(time);
     gramophone.update(time, delta, { speed: pose.speed, position: pose.position });
 
-    /** Etkileşim hedefini her frame güncelle. */
     refreshGramophonePrompt();
     interaction.setTargets(collectInteractables());
     const target = interaction.update(camera);
@@ -271,12 +298,16 @@ export function startExperience(container: HTMLElement): void {
       interactionHint.hide();
     }
 
+    /** World streaming — düşük frekanslı LOD / shadow culling. */
+    worldStreaming.update(camera.position);
+
     /** Mesafe-bazlı ses — REFERANS: GRAMOFON konumu (taşınıyor olsa bile). */
     gramophone.worldPosition(gramPos);
     const gain = audioDistance.update(delta, camera.position, gramPos);
     albumPanel.setDistanceGain(gain);
+    /** Uzaklaşma rüzgar sesini hafifçe öne çıkarsın — müziği bastırmadan. */
+    ambient.setMasterVolume(0.55 + audioDistance.muffle * 0.45);
 
-    /** Minimap. */
     minimap.update(
       pose.position,
       pose.yaw,

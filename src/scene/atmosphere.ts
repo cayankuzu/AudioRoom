@@ -1,28 +1,39 @@
 import * as THREE from "three";
+import type { WindState } from "../systems/windSystem";
 
 export interface AtmosphereHandle {
   object: THREE.Group;
-  update(t: number): void;
+  update(time: number, wind?: WindState): void;
 }
 
 interface Layer {
   points: THREE.Points;
   rotationSpeed: number;
-  driftAmp: number;
-  driftSpeed: number;
+  /** Yerel salınım (türbülans) genliği. */
+  localAmp: number;
+  /** Yerel salınım hızı (rad/sn). */
+  localFreq: number;
+  /** Rüzgar yönünün bu katmana ne kadar etki edeceği (metre). */
+  windDrift: number;
+  /** Y-ekseninde hafif iniş çıkış. */
+  verticalAmp: number;
   basePositions: Float32Array;
 }
 
 /**
- * Zenginleştirilmiş atmosfer:
- * - ground: yerde sürünen ince toz, çok alçak, çok yumuşak
- * - near:   oyuncuya yakın 1-5 m çapında küçük taneler
- * - mid:    2-20 m arası kalın toz bulutu
- * - high:   uzak haze / hava derinliği — puslu ufuk hissini besler
- * - dust:   hafif rüzgarla sürüklenen kum parçaları (yatay drift)
+ * Zenginleştirilmiş atmosfer — RÜZGAR entegre:
+ *  - Her katman WindState üzerinden ortak bir yön alır (tutarlı his).
+ *  - Katman başına `windDrift` katsayısı → ince toz çok, yüksek haze az sürüklenir.
+ *  - Küçük faz farklılıkları ile aynı hız yerine mini varyasyon (subtle randomness).
+ *  - `points.position` düzeyinde toplu drift → her frame attribute yazmadan önce
+ *    ucuz shift; gerçek lokal salınım ise attribute düzeyinde (küçük genlik).
  *
- * Her katmanın kendi dönüş hızı + Y-ekseni dalgalanması vardır; birlikte
- * çalıştığında sahne “yaşıyor” hissi verir ama oyun efekti gibi durmaz.
+ * Katmanlar (küçük → büyük ölçek):
+ *  - groundCrawl: yerde sürünen toz
+ *  - nearMicro:   göz hizasında ince mikro tane
+ *  - midCloud:    orta kalınlık toz bulutu
+ *  - highHaze:    uzak hava derinliği
+ *  - driftSand:   rüzgarla belirgin sürüklenen daha büyük kum parçaları
  */
 export function createAtmosphere(): AtmosphereHandle {
   const group = new THREE.Group();
@@ -36,8 +47,10 @@ export function createAtmosphere(): AtmosphereHandle {
     color: string,
     yBand: [number, number],
     rotationSpeed: number,
-    driftAmp: number,
-    driftSpeed: number,
+    localAmp: number,
+    localFreq: number,
+    windDrift: number,
+    verticalAmp: number,
   ): void {
     const positions = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
@@ -60,43 +73,66 @@ export function createAtmosphere(): AtmosphereHandle {
     });
     const points = new THREE.Points(geometry, material);
     group.add(points);
-    layers.push({ points, rotationSpeed, driftAmp, driftSpeed, basePositions: base });
+    layers.push({
+      points,
+      rotationSpeed,
+      localAmp,
+      localFreq,
+      windDrift,
+      verticalAmp,
+      basePositions: base,
+    });
   }
 
-  /** Yerde sürünen ince toz — 0..1.2 m, oyuncuya en yakın. */
-  layer(1800, 60, 0.055, 0.28, "#b7b8b9", [0.05, 1.3], 0.018, 0.12, 0.35);
-  /** Yakın mikro tane — göz hizası civarı. */
-  layer(1600, 80, 0.075, 0.26, "#a8aaad", [0.6, 4.8], 0.014, 0.18, 0.26);
+  /** Yerde sürünen ince toz. */
+  layer(1500, 62, 0.055, 0.28, "#b7b8b9", [0.05, 1.3], 0.01, 0.07, 0.32, 2.6, 0.05);
+  /** Yakın mikro tane. */
+  layer(1400, 80, 0.075, 0.24, "#a8aaad", [0.6, 4.8], 0.008, 0.09, 0.24, 1.7, 0.12);
   /** Orta kalınlık toz bulutu. */
-  layer(1100, 120, 0.12, 0.18, "#8b8e93", [2.5, 18], -0.009, 0.35, 0.18);
-  /** Yüksek haze — uzak hava derinliği. */
-  layer(620, 160, 0.24, 0.13, "#7b8088", [14, 48], 0.004, 0.0, 0.0);
-  /** Rüzgarla sürüklenen kum parçaları — daha büyük boy, az sayı. */
-  layer(420, 95, 0.19, 0.16, "#c1bdae", [1.2, 9], -0.022, 0.9, 0.55);
-
-  const tmp = new Float32Array(3);
-  void tmp;
+  layer(900, 120, 0.12, 0.16, "#8b8e93", [2.5, 18], -0.006, 0.14, 0.16, 0.95, 0.25);
+  /** Yüksek haze — uzak hava derinliği. Minimal hareket. */
+  layer(560, 170, 0.26, 0.14, "#7b8088", [14, 52], 0.003, 0, 0, 0.15, 0);
+  /** Rüzgarla sürüklenen kum. */
+  layer(360, 95, 0.19, 0.18, "#c1bdae", [1.2, 9], -0.015, 0.22, 0.5, 3.4, 0.2);
 
   return {
     object: group,
-    update(t: number) {
-      for (let li = 0; li < layers.length; li += 1) {
-        const layerData = layers[li];
-        layerData.points.rotation.y = t * layerData.rotationSpeed;
+    update(time, wind) {
+      const windDirX = wind ? wind.direction.x : 1;
+      const windDirZ = wind ? wind.direction.y : 0;
+      const windStr = wind ? wind.strength : 0.35;
+      const turb = wind ? wind.turbulence : 0;
 
-        if (layerData.driftAmp <= 0) continue;
-        const attr = layerData.points.geometry.getAttribute(
+      for (let li = 0; li < layers.length; li += 1) {
+        const ld = layers[li];
+
+        /** Ana grup dönüşü — aynı hızda değil, her katman biraz farklı. */
+        ld.points.rotation.y = time * ld.rotationSpeed;
+
+        /** Rüzgar drift — tüm katmanı topluca kaydır (ucuz). */
+        const drift = ld.windDrift * windStr;
+        /** Kapanış değişimi — modulo ile basic wrap: basePositions etrafında salın. */
+        const phase = time * 0.35 * (1 + li * 0.07);
+        const driftX = Math.sin(phase) * drift + windDirX * drift * 0.5;
+        const driftZ = Math.cos(phase * 0.85) * drift + windDirZ * drift * 0.5;
+
+        const attr = ld.points.geometry.getAttribute(
           "position",
         ) as THREE.BufferAttribute;
-        const base = layerData.basePositions;
-        const amp = layerData.driftAmp;
-        const sp = layerData.driftSpeed;
+        const base = ld.basePositions;
+
+        const amp = ld.localAmp;
+        const sp = ld.localFreq;
+        const vAmp = ld.verticalAmp;
+        const jitter = 1 + turb * 0.12;
+
+        /** Hafif salınım + rüzgar kayması; attribute'a tek yazım. */
         for (let i = 0; i < attr.count; i += 1) {
           const i3 = i * 3;
-          const phase = i * 0.17;
-          const sx = Math.sin(t * sp + phase) * amp;
-          const sy = Math.sin(t * sp * 0.7 + phase * 1.3) * amp * 0.3;
-          const sz = Math.cos(t * sp * 0.85 + phase * 0.9) * amp;
+          const fph = i * 0.17;
+          const sx = Math.sin(time * sp * jitter + fph) * amp + driftX;
+          const sz = Math.cos(time * sp * 0.85 * jitter + fph * 0.9) * amp + driftZ;
+          const sy = Math.sin(time * sp * 0.7 + fph * 1.3) * vAmp;
           attr.array[i3] = base[i3] + sx;
           attr.array[i3 + 1] = base[i3 + 1] + sy;
           attr.array[i3 + 2] = base[i3 + 2] + sz;

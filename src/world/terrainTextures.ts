@@ -32,6 +32,13 @@ export interface GroundMaps {
   colorMap: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
+  /**
+   * Yüksek frekanslı "micro" normal — yakın plan granül hissini güçlendirmek
+   * için shader içinde ikinci UV set'i gibi detayMap olarak harmanlanır.
+   */
+  detailNormalMap: THREE.CanvasTexture;
+  /** Macro + mid'i kırmak için geniş ölçekli varyasyon haritası. */
+  macroVariationMap: THREE.CanvasTexture;
 }
 
 export function createGroundSurfaceMaps(size = 1024): GroundMaps {
@@ -153,5 +160,86 @@ export function createGroundSurfaceMaps(size = 1024): GroundMaps {
   normalMap.repeat.set(72, 72);
   normalMap.anisotropy = 8;
 
-  return { colorMap, roughnessMap, normalMap };
+  /**
+   * Daha agresif micro normal — tek tek kum taneciği hissini taklit etmek için
+   * yüksek frekanslı octave'larla hazırlanır. Çok yüksek repeat (ör. 240x)
+   * ile uygulandığında yakın kamera çekimlerinde "kum taneli" yüzey etkisi.
+   */
+  const detailSize = Math.max(256, Math.floor(size / 2));
+  const dCanvas = document.createElement("canvas");
+  dCanvas.width = detailSize;
+  dCanvas.height = detailSize;
+  const dctx = dCanvas.getContext("2d");
+  if (!dctx) throw new Error("2D context yok");
+  const dImg = dctx.createImageData(detailSize, detailSize);
+  const dData = dImg.data;
+
+  function microHeightAt(fx: number, fy: number): number {
+    return (
+      layerNoise(fx, fy, 120) * 0.35 +
+      layerNoise(fx, fy, 320) * 0.45 +
+      layerNoise(fx, fy, 640) * 0.32 +
+      layerNoise(fx, fy, 1100) * 0.22
+    );
+  }
+
+  const dStep = 1 / detailSize;
+  for (let y = 0; y < detailSize; y += 1) {
+    for (let x = 0; x < detailSize; x += 1) {
+      const i = (y * detailSize + x) * 4;
+      const fx = x / detailSize;
+      const fy = y / detailSize;
+      const h = microHeightAt(fx, fy);
+      const dx = h - microHeightAt(fx + dStep, fy);
+      const dy = h - microHeightAt(fx, fy + dStep);
+      const nx = THREE.MathUtils.clamp(128 + dx * 3200, 0, 255);
+      const ny = THREE.MathUtils.clamp(128 + dy * 3200, 0, 255);
+      dData[i] = nx;
+      dData[i + 1] = ny;
+      dData[i + 2] = 255;
+      dData[i + 3] = 255;
+    }
+  }
+  dctx.putImageData(dImg, 0, 0);
+  const detailNormalMap = new THREE.CanvasTexture(dCanvas);
+  detailNormalMap.wrapS = detailNormalMap.wrapT = THREE.RepeatWrapping;
+  detailNormalMap.repeat.set(240, 240);
+  detailNormalMap.anisotropy = 8;
+
+  /**
+   * Düşük frekanslı, geniş ölçekli varyasyon. Yüzeyin "hep aynı tile"
+   * hissini kırar — koyu/parlak bantlar, yoğun/gevşek bölgeler oluşturur.
+   */
+  const mSize = 512;
+  const mCanvas = document.createElement("canvas");
+  mCanvas.width = mSize;
+  mCanvas.height = mSize;
+  const mctx = mCanvas.getContext("2d");
+  if (!mctx) throw new Error("2D context yok");
+  const mImg = mctx.createImageData(mSize, mSize);
+  const mData = mImg.data;
+  for (let y = 0; y < mSize; y += 1) {
+    for (let x = 0; x < mSize; x += 1) {
+      const i = (y * mSize + x) * 4;
+      const fx = x / mSize;
+      const fy = y / mSize;
+      const macro =
+        layerNoise(fx, fy, 1.3) * 0.55 +
+        layerNoise(fx, fy, 3.2) * 0.3 +
+        layerNoise(fx, fy, 7.5) * 0.15;
+      const v = Math.floor(THREE.MathUtils.clamp(macro, 0, 1) * 255);
+      mData[i] = v;
+      mData[i + 1] = v;
+      mData[i + 2] = v;
+      mData[i + 3] = 255;
+    }
+  }
+  mctx.putImageData(mImg, 0, 0);
+  const macroVariationMap = new THREE.CanvasTexture(mCanvas);
+  macroVariationMap.wrapS = macroVariationMap.wrapT = THREE.RepeatWrapping;
+  /** Çok küçük repeat → dev patch'ler → tile hissi kaybolur. */
+  macroVariationMap.repeat.set(1.4, 1.4);
+  macroVariationMap.anisotropy = 4;
+
+  return { colorMap, roughnessMap, normalMap, detailNormalMap, macroVariationMap };
 }

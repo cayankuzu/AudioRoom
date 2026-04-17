@@ -29,15 +29,16 @@ export const PLAYER = {
 
 export const FOOTPRINT = {
   /** Yürürken iki iz arasındaki hedef mesafe. Koşuda kendiliğinden düşer. */
-  stepDistance: 1.1,
-  lifetime: 9,
-  maxCount: 160,
-  /** Ayak izi boyutu — metre. */
-  size: { w: 0.42, l: 0.78 },
+  stepDistance: 1.05,
+  /** İz ömrü (saniye) — siyah kumda belirgin kalması için artırıldı. */
+  lifetime: 14,
+  maxCount: 180,
+  /** Ayak izi boyutu — metre. Biraz büyütüldü ki kumda net görünsün. */
+  size: { w: 0.48, l: 0.86 },
   /** Yanal kayma (sol-sağ). */
-  sideOffset: 0.19,
-  /** Başlangıç opaklık. */
-  opacity: 0.78,
+  sideOffset: 0.21,
+  /** Başlangıç opaklık — daha belirgin ama abartısız. */
+  opacity: 0.92,
 } as const;
 
 export const CAMERA = {

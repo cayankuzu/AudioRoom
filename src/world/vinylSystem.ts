@@ -3,7 +3,7 @@ import { CANONICAL_TRACKS } from "../data/trackLibrary";
 import { WORLD } from "../config/config";
 import type { InventoryState } from "../state/inventory";
 import { createVinyl } from "./vinyl";
-import { mulberry32 } from "../utils/helpers";
+import { createRng, scatterSpawnPoints, type SpawnPoint } from "../systems/spawnSystem";
 
 export interface VinylSpawn {
   order: number;
@@ -25,109 +25,103 @@ export interface VinylSystemHandle {
   update(time: number): void;
 }
 
+export interface VinylSystemOptions {
+  /** Oturum seed'i — her oturumda farklı yerleşim için. */
+  seed: number;
+  /** Kaçınılacak noktalar (gramofon, oyuncu başlangıcı, krater merkezi). */
+  avoid?: Array<{ x: number; z: number; radius: number }>;
+}
+
 /**
- * Anlamlı yerleştirme stratejisi — plaklar sahada anlamlı noktalarda:
- *  - 4 tanesi oyuncu başlangıç yönünde foreground (yakın keşif)
- *  - 4 tanesi krater dudağı / yamacında (orta mesafe)
- *  - 4 tanesi uzak tepelerin arasında (uzak keşif)
+ * Yerleştirme stratejisi — seeded random, anlamlı bantlarda dağıtılır:
+ *  - 4 plak yakın bant (merkeze 14..32m)
+ *  - 4 plak krater dudağı bandı
+ *  - 4 plak uzak tepeler (70..100m)
  *
- * Her plak canonical order'a doğrudan bağlıdır (1..12). Yerleşim
- * seed'li — aynı oyun deneyiminde aynı noktada olurlar.
+ * Tüm noktalar eğim / minimum spacing / avoid-bölge validation'ından geçer
+ * (scatterSpawnPoints). Her oturumda seed değiştiği için farklı, ama
+ * mantıklı bir dağılım oluşur.
  */
-const SEED = 20260417;
-
-interface VinylSpawnRecipe {
-  order: number;
-  /** Merkeze mesafe (yaklaşık metre). */
-  distance: number;
-  /** Açı (radyan) — oyuncu başlangıç yönüne göre ofset. */
-  angle: number;
-  /** Dikey ofset (metre). */
-  yOffset: number;
-  /** Rotasyon varyasyonu (radyan). */
-  tilt: number;
-}
-
-function buildRecipes(): VinylSpawnRecipe[] {
-  const rand = mulberry32(SEED);
-  const recipes: VinylSpawnRecipe[] = [];
-
-  /**
-   * Grup 1: yakın foreground — 4 plak, oyuncu başlangıç yönünde.
-   * yOffset artık ≥ 0.10 — tamamen gömülmesin, disk yüzeyi zemin üstünde görünür.
-   */
-  for (let i = 0; i < 4; i += 1) {
-    recipes.push({
-      order: i + 1,
-      distance: 18 + i * 6 + rand() * 3,
-      angle: (rand() - 0.5) * 1.1,
-      yOffset: 0.16 + rand() * 0.03,
-      tilt: (rand() - 0.5) * 0.18,
-    });
-  }
-  /** Grup 2: krater dudağı — 4 plak, tüm yönlerde. */
-  for (let i = 0; i < 4; i += 1) {
-    recipes.push({
-      order: i + 5,
-      distance: WORLD.craterRimRadius + (rand() - 0.5) * 6,
-      angle: (i / 4) * Math.PI * 2 + rand() * 0.6,
-      yOffset: 0.18 + rand() * 0.03,
-      tilt: (rand() - 0.5) * 0.26,
-    });
-  }
-  /** Grup 3: uzak tepeler — 4 plak, varyasyonlu. */
-  for (let i = 0; i < 4; i += 1) {
-    recipes.push({
-      order: i + 9,
-      distance: 70 + rand() * 25,
-      angle: rand() * Math.PI * 2,
-      yOffset: 0.18 + rand() * 0.04,
-      tilt: (rand() - 0.5) * 0.34,
-    });
-  }
-  return recipes;
-}
-
 export function createVinylSystem(
   getHeightAt: (x: number, z: number) => number,
   inventory: InventoryState,
-  viewerDir: THREE.Vector2,
+  options: VinylSystemOptions,
 ): VinylSystemHandle {
   const root = new THREE.Group();
   root.name = "vinylSystem";
 
-  const viewer = viewerDir.clone().normalize();
-  /** "Oyuncu başlangıç yönü" referans açısı: atan2(x, z). */
-  const baseAngle = Math.atan2(viewer.x, viewer.y);
+  const rand = createRng(options.seed);
+  const avoid = options.avoid ?? [];
 
-  const recipes = buildRecipes();
+  /** 3 bant - her biri için 4 aday çıkarıyoruz. */
+  const nearPoints = scatterSpawnPoints(rand, {
+    count: 4,
+    minDistanceFromCenter: 14,
+    maxDistanceFromCenter: 32,
+    minSpacing: 6,
+    avoid,
+    getHeightAt,
+    maxSlope: 0.85,
+  });
+  const rimPoints = scatterSpawnPoints(rand, {
+    count: 4,
+    minDistanceFromCenter: WORLD.craterRimRadius - 4,
+    maxDistanceFromCenter: WORLD.craterRimRadius + 8,
+    minSpacing: 7,
+    avoid,
+    getHeightAt,
+    maxSlope: 1.1,
+  });
+  const farPoints = scatterSpawnPoints(rand, {
+    count: 4,
+    minDistanceFromCenter: 68,
+    maxDistanceFromCenter: Math.min(112, WORLD.boundary - 8),
+    minSpacing: 10,
+    avoid,
+    getHeightAt,
+    maxSlope: 1.25,
+  });
+
+  const pools: SpawnPoint[][] = [nearPoints, rimPoints, farPoints];
   const spawns: VinylSpawn[] = [];
 
-  for (const recipe of recipes) {
-    const track = CANONICAL_TRACKS.find((t) => t.order === recipe.order);
+  /** order 1..12 — her bant 4 plak. */
+  const assignments: Array<{ order: number; pool: number }> = [];
+  for (let i = 0; i < 4; i += 1) assignments.push({ order: i + 1, pool: 0 });
+  for (let i = 0; i < 4; i += 1) assignments.push({ order: i + 5, pool: 1 });
+  for (let i = 0; i < 4; i += 1) assignments.push({ order: i + 9, pool: 2 });
+
+  for (const a of assignments) {
+    const track = CANONICAL_TRACKS.find((t) => t.order === a.order);
     if (!track) continue;
+    const pool = pools[a.pool];
+    if (!pool.length) continue;
+    /** Pool'dan rasgele bir aday çek — aynı noktaya iki plak gelmesin. */
+    const idx = Math.floor(rand() * pool.length);
+    const [pt] = pool.splice(idx, 1);
+    if (!pt) continue;
 
-    /** Grup 1 için baseAngle + ofset; diğer gruplar kendi açısını kullanır. */
-    const angle =
-      recipe.order <= 4 ? baseAngle + recipe.angle : recipe.angle;
-    const x = Math.sin(angle) * recipe.distance;
-    const z = Math.cos(angle) * recipe.distance;
-    const y = getHeightAt(x, z) + recipe.yOffset;
+    /** yOffset: her zaman ≥ 0.14 — plak diskleri zemine gömülmez. */
+    const yOffset = 0.16 + rand() * 0.04;
+    const tilt = (rand() - 0.5) * 0.24;
 
-    const vinyl = createVinyl({ order: recipe.order, title: track.title });
-    vinyl.position.set(x, y, z);
-    vinyl.rotation.z = recipe.tilt;
-    vinyl.rotation.y = Math.random() * Math.PI * 2;
+    const y = getHeightAt(pt.x, pt.z) + yOffset;
+    const vinyl = createVinyl({ order: a.order, title: track.title });
+    vinyl.position.set(pt.x, y, pt.z);
+    vinyl.rotation.z = tilt;
+    vinyl.rotation.y = rand() * Math.PI * 2;
 
     root.add(vinyl);
     spawns.push({
-      order: recipe.order,
+      order: a.order,
       title: track.title,
       position: vinyl.position.clone(),
       group: vinyl,
-      yBase: recipe.yOffset,
+      yBase: yOffset,
     });
   }
+
+  console.log("[VinylSystem]", `Seed: ${options.seed} · Yerleşen plak: ${spawns.length}/12`);
 
   const handle: VinylSystemHandle = {
     root,
@@ -139,7 +133,7 @@ export function createVinylSystem(
       if (!added) return false;
       /** Plağı sahneden gizle (tamamen remove etmiyoruz — drop gerekirse döner). */
       spawn.group.visible = false;
-      spawn.group.userData = {}; // raycast listesinden düşsün
+      spawn.group.userData = {};
       return true;
     },
     respawn(order, position) {

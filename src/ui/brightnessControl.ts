@@ -10,6 +10,7 @@ export interface BrightnessControl {
 }
 
 const STORAGE_KEY = "redd:brightness";
+const COLLAPSE_KEY = "redd:brightness:collapsed";
 
 function readStored(): number | null {
   try {
@@ -42,28 +43,53 @@ export function createBrightnessControl(parent: HTMLElement): BrightnessControl 
   const root = document.createElement("div");
   root.className = "bright-panel";
   const initial = readStored() ?? BRIGHTNESS.default;
+  const collapsedInitial = (() => {
+    try {
+      return window.localStorage.getItem(COLLAPSE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  })();
+  if (collapsedInitial) root.classList.add("bright-panel--collapsed");
   root.innerHTML = `
-    <label class="bright-panel__label">
-      <span class="bright-panel__kicker">Parlaklık</span>
-      <input
-        type="range"
-        class="bright-panel__slider"
-        min="${BRIGHTNESS.min}"
-        max="${BRIGHTNESS.max}"
-        step="${BRIGHTNESS.step}"
-        value="${initial}"
-        aria-label="Sahne parlaklığı"
-      />
-      <span class="bright-panel__value" aria-live="polite">${initial.toFixed(2)}×</span>
-    </label>
+    <button type="button" class="bright-panel__toggle" aria-label="Parlaklık panelini aç/kapat" title="Parlaklık">
+      <span class="bright-panel__toggle-dot" aria-hidden="true"></span>
+      <span class="bright-panel__toggle-label">Parlaklık</span>
+    </button>
+    <div class="bright-panel__body">
+      <label class="bright-panel__label">
+        <input
+          type="range"
+          class="bright-panel__slider"
+          min="${BRIGHTNESS.min}"
+          max="${BRIGHTNESS.max}"
+          step="${BRIGHTNESS.step}"
+          value="${initial}"
+          aria-label="Sahne parlaklığı"
+        />
+        <span class="bright-panel__value" aria-live="polite">${initial.toFixed(2)}×</span>
+      </label>
+    </div>
   `;
   parent.appendChild(root);
 
   const slider = root.querySelector<HTMLInputElement>(".bright-panel__slider");
   const valueEl = root.querySelector<HTMLSpanElement>(".bright-panel__value");
-  if (!slider || !valueEl) {
+  const toggleBtn = root.querySelector<HTMLButtonElement>(".bright-panel__toggle");
+  if (!slider || !valueEl || !toggleBtn) {
     throw new Error("Parlaklık kontrolü DOM eksik");
   }
+
+  toggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const nowCollapsed = !root.classList.contains("bright-panel--collapsed");
+    root.classList.toggle("bright-panel--collapsed", nowCollapsed);
+    try {
+      window.localStorage.setItem(COLLAPSE_KEY, nowCollapsed ? "1" : "0");
+    } catch {
+      /* yok say */
+    }
+  });
 
   const listeners = new Set<(exposure: number) => void>();
   const state = {

@@ -546,6 +546,79 @@ body {
   text-transform: uppercase;
 }
 
+/* ========================
+   Albüm paneli — ilerleme çubuğu
+   ======================== */
+.album-panel__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  padding: 0 0.1rem;
+  user-select: none;
+}
+
+.album-panel__progress-times {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.66rem;
+  color: #a9a9a9;
+  letter-spacing: 0.05em;
+}
+
+.album-panel__time--total {
+  color: #7c7c7c;
+}
+
+.album-panel__bar {
+  position: relative;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.album-panel__bar-track {
+  position: absolute;
+  inset: auto 0;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.album-panel__bar-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  width: 0%;
+  background: linear-gradient(90deg, #d9b170 0%, #f4d675 100%);
+  border-radius: 4px;
+  pointer-events: none;
+  transition: width 0.08s linear;
+}
+
+.album-panel__bar-handle {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f4d675;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left 0.08s linear, transform 0.15s ease;
+}
+
+.album-panel__bar:hover .album-panel__bar-handle {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
 .album-panel__controls {
   display: flex;
   align-items: center;
@@ -682,6 +755,20 @@ body {
 .album-panel__track.is-active {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.album-panel__track.is-loaded {
+  background: rgba(220, 195, 120, 0.08);
+  color: #f1dfb4;
+  box-shadow: inset 2px 0 0 rgba(220, 195, 120, 0.65);
+}
+
+.album-panel__track.is-loaded .album-panel__track-state {
+  color: #ebcf8a;
+}
+
+.album-panel__track.is-loaded .album-panel__track-index {
+  color: #d8c49a;
 }
 
 .album-panel__track-index {
@@ -902,12 +989,62 @@ body {
   padding: 0.45rem 0.7rem;
   backdrop-filter: blur(10px);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
-  min-width: 190px;
+  min-width: 210px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  transition: min-width 180ms ease, padding 180ms ease;
+}
+
+.bright-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  color: #b9b9b9;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 0.64rem;
+}
+
+.bright-panel__toggle:hover {
+  color: #fff;
+}
+
+.bright-panel__toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff, #666);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+  flex: 0 0 auto;
+}
+
+.bright-panel__body {
+  overflow: hidden;
+  max-height: 60px;
+  opacity: 1;
+  transition: max-height 180ms ease, opacity 180ms ease;
+}
+
+.bright-panel--collapsed {
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+}
+
+.bright-panel--collapsed .bright-panel__body {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .bright-panel__label {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.55rem;
   cursor: pointer;

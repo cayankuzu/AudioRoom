@@ -131,7 +131,13 @@ export function createTerrain(): TerrainHandle {
   const colDeep = new THREE.Color("#1d2126");
   const colRim = new THREE.Color("#24242a");
 
-  const { colorMap, roughnessMap, normalMap } = createGroundSurfaceMaps(1024);
+  const {
+    colorMap,
+    roughnessMap,
+    normalMap,
+    detailNormalMap,
+    macroVariationMap,
+  } = createGroundSurfaceMaps(1024);
 
   for (let i = 0; i < pos.count; i += 1) {
     const x = pos.getX(i);
@@ -168,6 +174,87 @@ export function createTerrain(): TerrainHandle {
     normalMap,
     normalScale: new THREE.Vector2(0.95, 0.95),
   });
+
+  /**
+   * Macro + mid + micro kum hissi için shader'a ek iki sample eklenir:
+   *  - `uDetailNormal`: çok yüksek frekanslı micro normal → yakın plan granül
+   *  - `uMacroVariation`: düşük frekanslı renk/roughness varyasyonu →
+   *     tile'ın robotik tekrarını kırar
+   *
+   * Kamera pozisyonuna göre foreground-boost uygulanır (yakın yerlerde
+   * detay daha güçlü). `uCameraY` uniform'u animate loop'ta güncellenir.
+   */
+  type ExtendedUniforms = {
+    uDetailNormal: { value: THREE.Texture };
+    uDetailRepeat: { value: number };
+    uDetailStrength: { value: number };
+    uMacroVariation: { value: THREE.Texture };
+    uMacroRepeat: { value: number };
+    uMacroStrength: { value: number };
+  };
+  const extendedUniforms: ExtendedUniforms = {
+    uDetailNormal: { value: detailNormalMap },
+    uDetailRepeat: { value: 240.0 },
+    uDetailStrength: { value: 0.55 },
+    uMacroVariation: { value: macroVariationMap },
+    uMacroRepeat: { value: 1.4 },
+    uMacroStrength: { value: 0.22 },
+  };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uDetailNormal = extendedUniforms.uDetailNormal;
+    shader.uniforms.uDetailRepeat = extendedUniforms.uDetailRepeat;
+    shader.uniforms.uDetailStrength = extendedUniforms.uDetailStrength;
+    shader.uniforms.uMacroVariation = extendedUniforms.uMacroVariation;
+    shader.uniforms.uMacroRepeat = extendedUniforms.uMacroRepeat;
+    shader.uniforms.uMacroStrength = extendedUniforms.uMacroStrength;
+
+    /**
+     * Three.js r152+ her map için ayrı UV varying kullanıyor:
+     *   vMapUv, vNormalMapUv, vRoughnessMapUv...
+     * `vUv` varsayılan olarak tanımlı DEĞİL (USE_UV / USE_ANISOTROPY yoksa).
+     * Tüm map'lerimiz aynı UV setini (attribute `uv`) kullandığı için
+     * güvenle `vMapUv` üzerinden sample yapabiliriz.
+     */
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+          uniform sampler2D uDetailNormal;
+          uniform float uDetailRepeat;
+          uniform float uDetailStrength;
+          uniform sampler2D uMacroVariation;
+          uniform float uMacroRepeat;
+          uniform float uMacroStrength;`,
+      )
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+          #ifdef USE_NORMALMAP_TANGENTSPACE
+            vec3 microN = texture2D(uDetailNormal, vNormalMapUv * uDetailRepeat).xyz * 2.0 - 1.0;
+            float viewDist = length(vViewPosition);
+            float nearBoost = 1.0 - smoothstep(3.0, 60.0, viewDist);
+            normal = normalize(normal + microN * uDetailStrength * nearBoost);
+          #endif`,
+      )
+      .replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+          #ifdef USE_MAP
+            float macroVar = texture2D(uMacroVariation, vMapUv * uMacroRepeat).r;
+            float macroMix = (macroVar - 0.5) * 2.0 * uMacroStrength;
+            diffuseColor.rgb *= (1.0 + macroMix);
+          #endif`,
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+          #ifdef USE_ROUGHNESSMAP
+            float macroVarR = texture2D(uMacroVariation, vRoughnessMapUv * uMacroRepeat).r;
+            roughnessFactor = clamp(roughnessFactor + (macroVarR - 0.5) * 0.22, 0.35, 1.0);
+          #endif`,
+      );
+  };
+  material.needsUpdate = true;
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;

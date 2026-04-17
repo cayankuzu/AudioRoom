@@ -283,7 +283,12 @@ export function createGramophone(
   };
 
   let platterRot = 0;
+  let platterSpeed = 0; // rad/sn
+  const targetPlatterSpeed = 2.2; // 33⅓ rpm hissine yakın
+  let mechStartPhase = 0; // 0..1 — plak takıldığı an ilk birkaç saniyedeki "uyanma" fazı
   let lastDropTime = 0;
+  /** Küçük varyasyon: başlangıç açı salınımı — robotik başlamasın. */
+  const mechJitterSeed = Math.random() * Math.PI * 2;
 
   /** Kameradaki "el" offseti. */
   const carriedOffset = new THREE.Vector3(0.3, -0.5, -0.92);
@@ -339,6 +344,7 @@ export function createGramophone(
   }
 
   function setActive(order: number): void {
+    const changing = state.activeOrder !== order;
     state.activeOrder = order;
     while (discSlot.children.length > 0) {
       const ch = discSlot.children[0];
@@ -347,8 +353,17 @@ export function createGramophone(
     if (order > 0) {
       discSlot.add(buildDiscMesh());
       activeGlow.intensity = 0.45;
+      /**
+       * Plak takıldığı an mekanik hissi: platter speed 0'dan hedefe yumuşak çıkar.
+       * Subtle randomness için mechStartPhase ile ufak bir salınım uygulanır.
+       */
+      if (changing) {
+        platterSpeed = 0;
+        mechStartPhase = 1;
+      }
     } else {
       activeGlow.intensity = 0;
+      mechStartPhase = 0;
     }
   }
 
@@ -423,9 +438,25 @@ export function createGramophone(
       }
     },
     update(time, delta, pose) {
-      /** Plak takılıyken platter döner. */
+      /**
+       * Plak takılıyken platter döner — mekanik hissiyat:
+       *  - Başlangıçta speed 0'dan `targetPlatterSpeed`'e yumuşak kalkış (1.6s civarı)
+       *  - Uyanma fazında ufak bir salınım (jitter) → gerçek motor hissi
+       *  - Plak çıkarılırsa hızlı yavaşlar ama sert değil
+       */
       if (state.activeOrder > 0) {
-        platterRot += delta * 2.2;
+        const k = 1 - Math.exp(-1.8 * delta);
+        platterSpeed += (targetPlatterSpeed - platterSpeed) * k;
+        if (mechStartPhase > 0.001) {
+          mechStartPhase *= Math.exp(-0.85 * delta);
+          const jitter = Math.sin(time * 9.0 + mechJitterSeed) * mechStartPhase * 0.35;
+          platterRot += (platterSpeed + jitter) * delta;
+        } else {
+          platterRot += platterSpeed * delta;
+        }
+      } else {
+        platterSpeed *= Math.exp(-2.4 * delta);
+        platterRot += platterSpeed * delta;
       }
       platter.rotation.y = platterRot;
       felt.rotation.y = platterRot;
