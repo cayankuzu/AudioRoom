@@ -14,6 +14,7 @@ import { createFigure } from "../world/figure";
 import { createText3D } from "../world/text3d";
 import { createGramophone } from "../world/gramophone";
 import { createVinylSystem } from "../world/vinylSystem";
+import { createCarrySystem } from "../world/carrySystem";
 
 import { createInput } from "../systems/inputSystem";
 import { createCollisionSystem } from "../systems/collisionSystem";
@@ -143,6 +144,13 @@ export function startExperience(container: HTMLElement): void {
   const cameraMotion = createCameraMotion();
   cameraMotion.setWind(wind.state);
 
+  /**
+   * --- Carry system ---
+   * Oyuncunun elinde gösterilen plak. Kameraya bağlı; tek seferde en fazla
+   * bir plak tutulur. Envanter `carriedOrder`'a ayna olarak güncellenir.
+   */
+  const carrySystem = createCarrySystem({ camera });
+
   const footprints = createFootprintSystem();
   scene.add(footprints.object);
 
@@ -156,31 +164,83 @@ export function startExperience(container: HTMLElement): void {
   const interactionHint = createInteractionHint(container);
   const minimap = createMinimap(container);
 
+  /**
+   * Plağın "yere düşme" konumunu oyuncunun önünde-ayağında hesaplar.
+   * Krater/engel kontrolü yapmaz — dropAt içeriden yBase ile zemine oturtur.
+   */
+  const dropVec = new THREE.Vector3();
+  const dropForward = new THREE.Vector3();
+  function computeDropSpotNearPlayer(): THREE.Vector3 {
+    camera.getWorldDirection(dropForward);
+    dropForward.y = 0;
+    if (dropForward.lengthSq() < 1e-4) dropForward.set(0, 0, -1);
+    dropForward.normalize();
+    dropVec
+      .copy(camera.position)
+      .addScaledVector(dropForward, 0.9)
+      .add(new THREE.Vector3(0, -PLAYER.eyeHeight * 0.9, 0));
+    return dropVec;
+  }
+
   /** --- Interaction: E (topla / kullan), Y (gramofon taşı) --- */
   const interaction = createInteractionSystem({
     onCollectVinyl(order) {
-      const spawn = vinylSystem.spawns.find((s) => s.order === order);
-      if (!spawn) return;
-      const ok = vinylSystem.collect(order);
-      if (!ok) return;
-      console.log("[Plak]", `Toplandı → order=${order} "${spawn.title}"`);
       /**
-       * KURAL: Müzik SADECE plak gramofona TAKILDIĞINDA başlar.
+       * KLASİK PICKUP/DROP:
+       *  - Eğer elde bir plak varsa, önce o plağı oyuncunun ayağına düşür.
+       *  - Sonra yeni plağı eline al ve dünya sahnesinden gizle.
+       *  - Envantere EKLEME YOK — bir plak ancak gramofona YERLEŞTİRİLDİĞİNDE
+       *    `collected` setine girer (panel listesi bundan beslenir).
        */
-      albumPanel.refreshInventory();
+      const targetSpawn = vinylSystem.getSpawn(order);
+      if (!targetSpawn) return;
+      if (!targetSpawn.group.visible) return;
+
+      /** Aynı plağı zaten elinde tutuyorsan tekrar alınmaz. */
+      if (inventory.isCarrying(order)) return;
+
+      const dropSpot = computeDropSpotNearPlayer();
+      const dropped = inventory.pickUp(order);
+      if (dropped > 0) {
+        /** Eski elindeki plağı dünyaya düşür — ayağının yanına. */
+        vinylSystem.dropAt(dropped, dropSpot);
+        console.log("[Plak]", `El bırakıldı → order=${dropped}`);
+      }
+      /** Yeni plağı world mesh'inden kaldır. */
+      vinylSystem.pickUp(order);
+      /** Elde görseli güncelle. */
+      carrySystem.setCarried(order);
+      console.log("[Plak]", `El alındı → order=${order} "${targetSpawn.title}"`);
     },
     onGramophoneE() {
       /**
        * Gramofon ile etkileşim:
-       *  1. Takılı plak yoksa → envanterdeki ilk plağı tak ve çal.
-       *  2. Takılı plak varsa → çalıyorsa duraklat; duraklatıldıysa devam ettir.
+       *  1. Elde plak varsa → GRAMOFONA YERLEŞTİR. Gramofonda eski plak varsa
+       *     swap edilir (eski plak ele döner). İlk kez yerleştirilen plak
+       *     `collected` setine eklenir → panel listesinde görünür → müzik başlar.
+       *  2. Elde plak YOKSA ve gramofonda takılı plak varsa → play/pause toggle.
+       *  3. Elde de gramofonda da hiçbir şey yoksa → sessiz no-op (prompt zaten bilgilendiriyor).
        */
-      if (gramophone.activeOrder === 0) {
-        const first = Array.from(inventory.collected).sort((a, b) => a - b)[0];
-        if (first === undefined) return;
-        gramophone.setActive(first);
-        albumPanel.playOrder(first);
-      } else {
+      if (inventory.carriedOrder > 0) {
+        const result = inventory.placeCarriedOnGramophone();
+        if (!result) return;
+        const { placed, swappedOut } = result;
+        /**
+         * Gramofon mesh state'i ve carry görseli `inventory.onChange` üzerinden
+         * atomik olarak güncellenir (tek emit). Burada yalnızca müziği başlat.
+         */
+        albumPanel.playOrder(placed);
+        if (swappedOut > 0) {
+          console.log(
+            "[Plak]",
+            `Gramofona yerleştirildi (swap) → yeni=${placed}, ele geri dönen=${swappedOut}`,
+          );
+        } else {
+          console.log("[Plak]", `Gramofona yerleştirildi → order=${placed}`);
+        }
+        return;
+      }
+      if (gramophone.activeOrder > 0) {
         albumPanel.togglePlayback();
       }
     },
@@ -204,9 +264,17 @@ export function startExperience(container: HTMLElement): void {
   document.addEventListener("keydown", onKeyDown);
 
   inventory.onChange((snap) => {
+    /** Gramofon mesh state envanterle birebir. */
     if (gramophone.activeOrder !== snap.activeOrder) {
       gramophone.setActive(snap.activeOrder);
     }
+    /** Elde tutulan plak değiştiyse carry görseli senkronize olsun. */
+    if (carrySystem.currentOrder !== snap.carriedOrder) {
+      if (snap.carriedOrder > 0) carrySystem.setCarried(snap.carriedOrder);
+      else carrySystem.clear();
+    }
+    /** Panel listesi `collected`e bakıyor — yeni plak eklendiyse refresh. */
+    albumPanel.refreshInventory();
   });
 
   startOverlay.onStart(() => {
@@ -252,13 +320,24 @@ export function startExperience(container: HTMLElement): void {
       interactable?: { promptKey: string; promptText: string };
     };
     if (!ud.interactable) return;
-    if (gramophone.activeOrder > 0) {
+    /**
+     * Prompt öncelik:
+     *  1. Elde plak varsa → "E — plağı tak (swap varsa bildir)"
+     *  2. Gramofonda plak + çalıyor → "E — duraklat"
+     *  3. Gramofonda plak + durmuş → "E — devam et"
+     *  4. Hiçbir şey yok → "Önce plağını bul"
+     */
+    if (inventory.carriedOrder > 0) {
+      if (gramophone.activeOrder > 0) {
+        ud.interactable.promptText = "E — plakları değiştir · Y — taşı";
+      } else {
+        ud.interactable.promptText = "E — plağı tak · Y — taşı";
+      }
+    } else if (gramophone.activeOrder > 0) {
       ud.interactable.promptText =
         albumPanel.activeOrder() > 0
           ? "E — duraklat · Y — taşı"
           : "E — müziği devam ettir · Y — taşı";
-    } else if (inventory.collected.size > 0) {
-      ud.interactable.promptText = "E — plak tak · Y — taşı";
     } else {
       ud.interactable.promptText = "Önce bir plak bul · Y — taşı";
     }
@@ -285,15 +364,39 @@ export function startExperience(container: HTMLElement): void {
     text3d.update(time, delta);
 
     vinylSystem.update(time);
+    carrySystem.update(time, { speed: pose.speed });
     gramophone.update(time, delta, { speed: pose.speed, position: pose.position });
 
     refreshGramophonePrompt();
     interaction.setTargets(collectInteractables());
     const target = interaction.update(camera);
     if (target) {
+      /**
+       * Vinyl hedefi için prompt'u dinamik ayarla:
+       *  - El boşsa → "E — plağı al"
+       *  - Elde farklı plak varsa → "E — elindekini bırak, bunu al" (klasik swap hissi)
+       *  - Aynı plağa bakıyorsa (teorik) → sessizce sadece "plağı al"
+       */
+      if (target.descriptor.kind === "vinyl" && target.descriptor.vinylOrder) {
+        const order = target.descriptor.vinylOrder;
+        const spawn = vinylSystem.getSpawn(order);
+        const title = spawn?.title ?? "";
+        if (inventory.carriedOrder > 0 && inventory.carriedOrder !== order) {
+          target.descriptor.promptText = `E — elindekini bırak, "${title}" plağını al`;
+        } else {
+          target.descriptor.promptText = `E — plağı al · "${title}"`;
+        }
+      }
       interactionHint.show(target.descriptor.promptKey, target.descriptor.promptText);
     } else if (gramophone.state === "carried") {
       interactionHint.show("Y", "Gramofonu taşıyorsun · bırakmak için Y");
+    } else if (inventory.carriedOrder > 0) {
+      /**
+       * Herhangi bir hedefe bakmıyoruz ama elde plak var — oyuncuya ne
+       * yapabileceğini sessizce hatırlat.
+       */
+      const title = vinylSystem.getSpawn(inventory.carriedOrder)?.title ?? "";
+      interactionHint.show("i", `Elinde "${title}" plağı · gramofona yaklaş`);
     } else {
       interactionHint.hide();
     }

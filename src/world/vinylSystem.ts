@@ -17,10 +17,20 @@ export interface VinylSpawn {
 export interface VinylSystemHandle {
   root: THREE.Group;
   spawns: VinylSpawn[];
-  /** Bir plağı topla — `order` canonical sıra. Başarılıysa true. */
-  collect(order: number): boolean;
-  /** Oyuncu plağı düşürdüğünde / testte yeniden koymak için. */
-  respawn(order: number, position: THREE.Vector3): void;
+  /**
+   * Bir plağı dünya sahnesinden AL (gizle) — ele geçiş için. Envantere eklemez,
+   * yalnızca world mesh'i görünmez yapar ve interactable'dan çıkarır.
+   * Başarılıysa true.
+   */
+  pickUp(order: number): boolean;
+  /**
+   * Bir plağı dünyaya YERLEŞTİR — oyuncunun önüne/ayağına düşürülme için.
+   * World mesh'i tekrar görünür yapar ve interactable descriptor'unu geri verir.
+   * `position` verilirse oraya, verilmezse önceki yerine konumlandırır.
+   */
+  dropAt(order: number, position?: THREE.Vector3): void;
+  /** Spawn pozisyonunu döner (mevcut spawn'lardan). */
+  getSpawn(order: number): VinylSpawn | null;
   /** Her frame çağır — hover/halo animasyonu. */
   update(time: number): void;
 }
@@ -44,7 +54,7 @@ export interface VinylSystemOptions {
  */
 export function createVinylSystem(
   getHeightAt: (x: number, z: number) => number,
-  inventory: InventoryState,
+  _inventory: InventoryState,
   options: VinylSystemOptions,
 ): VinylSystemHandle {
   const root = new THREE.Group();
@@ -126,30 +136,35 @@ export function createVinylSystem(
   const handle: VinylSystemHandle = {
     root,
     spawns,
-    collect(order) {
+    pickUp(order) {
       const spawn = spawns.find((s) => s.order === order);
       if (!spawn) return false;
-      const added = inventory.add(order);
-      if (!added) return false;
-      /** Plağı sahneden gizle (tamamen remove etmiyoruz — drop gerekirse döner). */
+      if (!spawn.group.visible) return false;
+      /** Plağı sahneden gizle — envanter işlemine DOKUNMAZ, caller yapar. */
       spawn.group.visible = false;
       spawn.group.userData = {};
       return true;
     },
-    respawn(order, position) {
+    dropAt(order, position) {
       const spawn = spawns.find((s) => s.order === order);
       if (!spawn) return;
-      spawn.group.position.copy(position);
+      if (position) {
+        /** yBase + zemin: plak havada veya gömülü kalmasın. */
+        const y = getHeightAt(position.x, position.z) + spawn.yBase;
+        spawn.group.position.set(position.x, y, position.z);
+      }
       spawn.group.visible = true;
       spawn.group.userData = {
         interactable: {
           kind: "vinyl",
           vinylOrder: order,
           promptKey: "E",
-          promptText: `E bas — "${spawn.title}" plağını al`,
+          promptText: `E — plağı al · "${spawn.title}"`,
         },
       };
-      inventory.remove(order);
+    },
+    getSpawn(order) {
+      return spawns.find((s) => s.order === order) ?? null;
     },
     update(time) {
       /** Hafif yukarı-aşağı bob + halo pulsing — yBase üzerinden. */
