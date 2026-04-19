@@ -16,7 +16,7 @@ export interface MobileControlsOptions {
 }
 
 /**
- * Dokunmatik: sol alt D-pad, sağ alt E/Q/K/H/Space, üst toolbar (Redd düzeni;
+ * Dokunmatik: sol alt D-pad, sağ alt E/Q/G/H/Space, üst toolbar (Redd düzeni;
  * fener yok — Kuantum mekaniği).
  */
 export function createMobileControls(
@@ -52,8 +52,8 @@ export function createMobileControls(
         <span class="mobile-controls__action-glyph">⤒</span>
         <span class="mobile-controls__action-label">ZIPLA</span>
       </button>
-      <button type="button" class="mobile-controls__action mobile-controls__action--measure" data-key="KeyK" aria-label="Konum ölç">
-        <span class="mobile-controls__action-glyph">K</span>
+      <button type="button" class="mobile-controls__action mobile-controls__action--measure" data-key="KeyG" aria-label="Konum ölç">
+        <span class="mobile-controls__action-glyph">G</span>
         <span class="mobile-controls__action-label">KONUM</span>
       </button>
       <button type="button" class="mobile-controls__action mobile-controls__action--measure" data-key="KeyH" aria-label="Hız ölç">

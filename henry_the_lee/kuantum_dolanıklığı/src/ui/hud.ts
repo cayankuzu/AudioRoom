@@ -1,6 +1,6 @@
 /**
  * Sol-üst kontroller paneli — Redd · Mükemmel Boşluk HUD birebir kopyası.
- * Sadece kuantum'a özel kısayolları (K = Konum, H = Hız) listeler.
+ * Redd ile aynı panel kısayolları (M/K/P) + ölçüm (G/H) listelenir.
  *
  * Davranış:
  *  - Collapsible: sağdaki "−" butonu paneli daraltır, "+" yapar.
@@ -41,14 +41,18 @@ export function createHud(parent: HTMLElement, options: HudOptions = {}): Hud {
     </header>
     <div class="hud__body">
       <div class="hud__row"><span>WASD / Oklar</span><em>Yürü</em></div>
-      <div class="hud__row"><span>Shift</span><em>Koş</em></div>
+      <div class="hud__row"><span>Shift / KOŞ</span><em>Koş (tek başına ileri)</em></div>
       <div class="hud__row"><span>Boşluk</span><em>Zıpla</em></div>
       <div class="hud__row"><span>Fare</span><em>Bakış</em></div>
       <div class="hud__divider"></div>
       <div class="hud__row"><span>E</span><em>Plak / gramofonu al · plağı tak</em></div>
       <div class="hud__row"><span>Q</span><em>Elindekini bırak</em></div>
       <div class="hud__divider"></div>
-      <div class="hud__row hud__row--hint"><span>K</span><em>Konum ölç</em></div>
+      <div class="hud__row hud__row--hint"><span>M</span><em>Harita aç / kapa</em></div>
+      <div class="hud__row hud__row--hint"><span>K</span><em>Kontroller (bu panel)</em></div>
+      <div class="hud__row hud__row--hint"><span>P</span><em>Albüm paneli</em></div>
+      <div class="hud__divider"></div>
+      <div class="hud__row hud__row--hint"><span>G</span><em>Konum ölç</em></div>
       <div class="hud__row hud__row--hint"><span>H</span><em>Hız ölç</em></div>
       <div class="hud__divider"></div>
       <div class="hud__row hud__row--hint"><span>ESC</span><em>İmleci serbest bırak</em></div>

@@ -1,5 +1,4 @@
 import { startExperience } from "./gameLoop";
-import { createHud } from "../ui/hud";
 import { createBrandFooter } from "../ui/brandFooter";
 
 /**
@@ -8,7 +7,7 @@ import { createBrandFooter } from "../ui/brandFooter";
  *
  * UI katmanları:
  *  - .start-overlay   → ilk giriş (is-first) + ESC sonrası pause (is-pause)
- *  - .hud             → sol üst kontroller paneli (collapsible)
+ *  - .hud             → sol üst kontroller (gameLoop attachUi; K ile aç/kapa)
  *  - .minimap         → sol alt kuşbakışı radar (gameLoop'tan attach)
  *  - .interaction-hint→ alt orta proximity prompt (gameLoop yönetir)
  *  - .measurement-pill→ üst orta KONUM/HIZ snapshot (gameLoop yönetir)
@@ -41,7 +40,7 @@ export function bootstrapApp(root: HTMLElement): void {
       <p class="start-overlay__kicker">Henry the Lee</p>
       <h2>Kuantum Dolanıklık</h2>
       <p class="start-overlay__desc">
-        Boşlukta süzülen bir plak. <strong>K</strong> ile konumunu,
+        Boşlukta süzülen bir plak. <strong>G</strong> ile konumunu,
         <strong>H</strong> ile hızını ölçebilirsin — fakat asla aynı anda.
         Heisenberg sınırı içinde plağı bulup gramofona yerleştir.
       </p>
@@ -52,8 +51,11 @@ export function bootstrapApp(root: HTMLElement): void {
         <div class="start-overlay__ctrl"><span>FARE</span><em>Bakış</em></div>
         <div class="start-overlay__ctrl"><span>E</span><em>Al / Yerleştir</em></div>
         <div class="start-overlay__ctrl"><span>Q</span><em>Bırak</em></div>
-        <div class="start-overlay__ctrl"><span>K</span><em>Konum ölç</em></div>
+        <div class="start-overlay__ctrl"><span>G</span><em>Konum ölç</em></div>
         <div class="start-overlay__ctrl"><span>H</span><em>Hız ölç</em></div>
+        <div class="start-overlay__ctrl"><span>M</span><em>Harita</em></div>
+        <div class="start-overlay__ctrl"><span>K</span><em>Kontroller</em></div>
+        <div class="start-overlay__ctrl"><span>P</span><em>Albüm</em></div>
       </div>
       <button type="button" class="start-overlay__cta" data-start>EVRENE GİR</button>
     </article>
@@ -111,9 +113,6 @@ export function bootstrapApp(root: HTMLElement): void {
       document.body.classList.add("is-overlay-open");
     }
   });
-
-  /** ── HUD (sol üst, kontroller paneli) ─────────────────────────── */
-  createHud(document.body, { showLibraryBack: true, libraryHref: "../../" });
 
   /** ── Brand footer (alt orta) ──────────────────────────────────── */
   createBrandFooter(document.body);

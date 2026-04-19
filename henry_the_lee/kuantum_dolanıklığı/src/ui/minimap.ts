@@ -58,7 +58,7 @@ export function createMinimap(parent: HTMLElement): Minimap {
     </div>
     <canvas class="minimap__canvas" width="220" height="220"></canvas>
     <div class="minimap__legend" aria-hidden="true">
-      <span><kbd>K</kbd> Konum</span>
+      <span><kbd>G</kbd> Konum</span>
       <span><kbd>H</kbd> Hız</span>
     </div>
   `;

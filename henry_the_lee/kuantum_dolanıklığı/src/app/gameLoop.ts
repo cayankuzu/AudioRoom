@@ -15,6 +15,7 @@ import { createGramophone } from "../world/gramophone";
 import { createVinylDisk } from "../world/vinylDisk";
 import { createCat } from "../world/cat";
 import { createMinimap } from "../ui/minimap";
+import { createHud } from "../ui/hud";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMeasurementPill } from "../ui/measurementPill";
 import { createAlbumPanel, type AlbumPanel } from "../ui/albumPanel";
@@ -49,13 +50,12 @@ export interface ExperienceHandle {
  *
  * Etkileşim modeli:
  *  - WASD/Shift/Space → hareket
- *  - K → KONUM ölç (Heisenberg snapshot, plak konumu pill + minimap flash)
- *  - H → HIZ ölç   (Heisenberg snapshot, anlık skaler hız pill)
+ *  - G → KONUM ölç (Heisenberg), H → HIZ ölç; M/K/P Redd ile aynı: harita,
+ *    kontroller (HUD), albüm paneli
  *  - E → yakın objeyi al / plağı gramofon tablasına yerleştir
  *  - Q → eldekini bırak
  *
- * Cooldown: K/H aynı anda olamaz, ardışık ölçümler arası MEASUREMENT.cooldown
- * sn beklenir (sistem zaten tutarlı cooldown sağlar).
+ * Cooldown: G/H ölçümleri aynı anda olamaz; MEASUREMENT.cooldown sistemde.
  */
 export function startExperience(container: HTMLElement): ExperienceHandle {
   const renderer = createRenderer(container);
@@ -112,6 +112,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const audioDist = createAudioDistanceSystem();
 
   /** ── UI handles (attachUi'de doldurulur) ─────────────────────── */
+  let hud: ReturnType<typeof createHud> | null = null;
   let minimap: ReturnType<typeof createMinimap> | null = null;
   let hint: ReturnType<typeof createInteractionHint> | null = null;
   let pill: ReturnType<typeof createMeasurementPill> | null = null;
@@ -227,7 +228,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     }
   };
 
-  offKeys.push(input.onKeyPress("KeyK", tryMeasurePosition));
+  offKeys.push(input.onKeyPress("KeyG", tryMeasurePosition));
   offKeys.push(input.onKeyPress("KeyH", tryMeasureVelocity));
   offKeys.push(input.onKeyPress("KeyE", tryPickupOrPlace));
   offKeys.push(input.onKeyPress("KeyQ", tryDrop));
@@ -235,6 +236,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const attachUi = (parent: HTMLElement) => {
     if (uiMounted) return;
     uiMounted = true;
+    hud = createHud(parent, { showLibraryBack: true, libraryHref: "../../" });
     minimap = createMinimap(parent);
     hint = createInteractionHint(parent);
     pill = createMeasurementPill(parent);
@@ -255,8 +257,39 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
 
   attachUi(document.body);
   /** attachUi içinde atanıyor; closure atamaları TS daraltmasına girmez. */
+  const uiHud = hud!;
   const uiMinimap = minimap!;
   const uiAlbumPanel = albumPanel!;
+
+  /**
+   * Redd · Mükemmel Boşluk ile aynı kısayollar (edge, form alanında yutulur):
+   * M harita, K kontroller (HUD), P albüm / oynatıcı paneli.
+   */
+  const onUiShortcutKeyDown = (e: KeyboardEvent) => {
+    if (e.repeat) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+      return;
+    }
+    switch (e.code) {
+      case "KeyM":
+        uiMinimap.toggle();
+        e.preventDefault();
+        break;
+      case "KeyK":
+        uiHud.toggle();
+        e.preventDefault();
+        break;
+      case "KeyP":
+        uiAlbumPanel.toggle();
+        e.preventDefault();
+        break;
+      default:
+        break;
+    }
+  };
+  document.addEventListener("keydown", onUiShortcutKeyDown);
+  offKeys.push(() => document.removeEventListener("keydown", onUiShortcutKeyDown));
 
   async function toggleFullscreen(): Promise<void> {
     try {
@@ -477,6 +510,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       );
       offKeys.forEach((off) => off());
       input.dispose();
+      hud?.dispose();
       minimap?.dispose();
       hint?.dispose();
       pill?.dispose();

@@ -425,7 +425,7 @@ body {
 }
 
 /**
- * Minimap legend — canvas altı, K=Konum · H=Hız ipucu çifti.
+ * Minimap legend — canvas altı, G=Konum · H=Hız ipucu çifti.
  * Redd-style key pill ile aksan tonu birebir.
  */
 .minimap__legend {
@@ -1140,7 +1140,7 @@ body {
   grid-row: 1;
 }
 
-.mobile-controls__actions--quantum [data-key="KeyK"] {
+.mobile-controls__actions--quantum [data-key="KeyG"] {
   grid-column: 2;
   grid-row: 1;
 }

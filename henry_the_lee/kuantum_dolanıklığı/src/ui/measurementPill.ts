@@ -2,7 +2,7 @@
  * Geçici ölçüm okuma kapsülü — ekran üst-merkezde görünür, fade-out'la kaybolur.
  * Heisenberg ilkesini görselleştirir: tek seferlik bir snapshot.
  *
- *  K → "Konum"  : "Plak X.X m uzakta · (x, z)" + minimap'te dot
+ *  G → "Konum"  : "Plak X.X m uzakta · (x, z)" + minimap'te dot
  *  H → "Hız"    : "Plak X.XX m/s"
  */
 

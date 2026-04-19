@@ -67,12 +67,22 @@ export function createMovementSystem(
       pose.yaw += look.x;
       pose.pitch = clamp(pose.pitch + look.y, -1.25, 1.1);
 
-      const forwardAxis =
+      let forwardAxis =
         Number(input.pressed.has("KeyW") || input.pressed.has("ArrowUp")) -
         Number(input.pressed.has("KeyS") || input.pressed.has("ArrowDown"));
       const strafeAxis =
         Number(input.pressed.has("KeyD") || input.pressed.has("ArrowRight")) -
         Number(input.pressed.has("KeyA") || input.pressed.has("ArrowLeft"));
+
+      const sprinting =
+        input.pressed.has("ShiftLeft") || input.pressed.has("ShiftRight");
+      /**
+       * Koş tuşu tek başına: ileri + koş hızı (mobil KOŞ veya Shift); geri
+       * (S/↓) basılıyken otomatik ileri ekleme yapılmaz.
+       */
+      if (sprinting && forwardAxis === 0 && strafeAxis === 0) {
+        forwardAxis = 1;
+      }
 
       forward.set(-Math.sin(pose.yaw), 0, -Math.cos(pose.yaw));
       right.set(Math.cos(pose.yaw), 0, -Math.sin(pose.yaw));
@@ -81,9 +91,6 @@ export function createMovementSystem(
       wishDir.addScaledVector(forward, forwardAxis);
       wishDir.addScaledVector(right, strafeAxis);
       if (wishDir.lengthSq() > 0) wishDir.normalize();
-
-      const sprinting =
-        input.pressed.has("ShiftLeft") || input.pressed.has("ShiftRight");
       const targetSpeed = sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
 
       const accel = pose.grounded ? PLAYER.accelGround : PLAYER.accelAir;
