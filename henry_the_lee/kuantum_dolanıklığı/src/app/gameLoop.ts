@@ -20,7 +20,7 @@ import { createAlbumPanel, type AlbumPanel } from "../ui/albumPanel";
 import { createMobileControls } from "../ui/mobileControls";
 import { createAudioDistanceSystem } from "../systems/audioDistanceSystem";
 import { createCarryState, type CarryHolding } from "../state/carry";
-import { CARRY } from "../config/config";
+import { applyWorldScaleForInput, CARRY } from "../config/config";
 import { pickSpawn, randomYaw, type SpawnPoint } from "../utils/spawn";
 import {
   exitFullscreen,
@@ -69,6 +69,10 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   scene.add(camera);
   const worldLights = createLights(scene);
 
+  /** Dokunmatikte 180 m kutu — `createRoom` / spawn öncesi `WORLD.half` ayarlanır. */
+  const input = createInput(renderer.domElement);
+  applyWorldScaleForInput(input.isTouch);
+
   /** ── Dünya ───────────────────────────────────────────────────── */
   createRoom(scene);
   const waveFloor = createWaveFloor(scene);
@@ -98,7 +102,6 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const cat = createCat(scene, { startPosition: catSpawn });
 
   /** ── Sistemler ───────────────────────────────────────────────── */
-  const input = createInput(renderer.domElement);
   const movement = createMovementSystem(camera, input);
   const measurement = createMeasurementSystem();
   const carry = createCarryState();

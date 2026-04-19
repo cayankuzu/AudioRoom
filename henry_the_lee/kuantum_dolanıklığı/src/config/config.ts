@@ -9,17 +9,24 @@
  */
 
 /**
- * Kutu evren — KARE TABAN (333 m × 333 m), 42 m tavan.
+ * Kutu evren — KARE TABAN, 42 m tavan.
  * Oyuncu kutu içinde gezinir; duvar/tavan/zemin = sınır.
  *
  * GEOMETRİ KURALI: X ve Z eksenleri her zaman `half * 2` ile eşit
  * boyutlandırılır (taban kare). Yalnızca Y (yükseklik) bağımsızdır.
  * Tüm dünya geometrisi (room.ts, waveFloor.ts, particles.ts, spawn.ts)
  * sadece `WORLD.half` üstünden ölçeklenir → asimetri imkânsız.
+ *
+ * `half` masaüstünde 166.5 m (333 m kutu); dokunmatikte `applyWorldScaleForInput`
+ * ile 90 m (180 m kutu) yapılır — yalnızca telefon/tablet deneyimi.
  */
+export const WORLD_HALF_DESKTOP = 166.5;
+/** Dokunmatik: 180 m × 180 m taban → yarım kenar 90 m. */
+export const WORLD_HALF_TOUCH = 90;
+
 export const WORLD = {
-  /** Kutunun yarım kenarı (metre). 333 m alan → half = 166.5. */
-  half: 166.5,
+  /** Kutunun yarım kenarı (metre); başlangıç masaüstü, sahne kurulumunda güncellenir. */
+  half: WORLD_HALF_DESKTOP,
   /** Tavan yüksekliği (metre) — kompozisyon yukarıda asıldığı için yüksek. */
   ceilingHeight: 42,
   /**
@@ -28,7 +35,14 @@ export const WORLD = {
    */
   fogColor: "#140e05",
   fogDensity: 0.0056,
-} as const;
+};
+
+/**
+ * Oyun başlamadan, oda/parçacık/spawn kurulmadan hemen önce çağrılmalı.
+ */
+export function applyWorldScaleForInput(isTouch: boolean): void {
+  WORLD.half = isTouch ? WORLD_HALF_TOUCH : WORLD_HALF_DESKTOP;
+}
 
 /**
  * Kuantum zemin — sürekli dalgalanan sıvı yüzey + ayak izi tepkisi.
