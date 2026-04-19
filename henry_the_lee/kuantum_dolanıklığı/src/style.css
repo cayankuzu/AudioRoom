@@ -1073,7 +1073,7 @@ body {
   grid-row: 3;
 }
 .mobile-controls__pad--run {
-  grid-column: 1;
+  grid-column: 3;
   grid-row: 3;
   font-size: 0.62rem;
   letter-spacing: 0.18em;
