@@ -1,0 +1,1631 @@
+/* ============================================================
+ * Henry the Lee — Kuantum Dolanıklığı
+ * UI/UX Redd · Mükemmel Boşluk paneli ile **birebir** tutarlı.
+ * Tek fark: aksan tonu = kapaktaki amber sarı (#f3c012).
+ *
+ * Panel inventarı (Redd ile aynı isimlendirme):
+ *   .hud              — sol üst, kontroller listesi (collapsible)
+ *   .minimap          — sol alt, kuşbakışı radar (collapsible)
+ *   .interaction-hint — alt orta, key+text pill (proximity prompt)
+ *   .brand-footer     — alt orta-alt, © pill
+ *   .measurement-pill — sol alt, minimap üstünde transient KONUM/HIZ readout
+ *   .start-overlay    — ilk giriş + pause kartı (Redd-style)
+ * ============================================================ */
+
+:root {
+  font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  color: #ececec;
+  background: #050406;
+  color-scheme: dark;
+
+  /** Kuantum aksan paleti — amber sarısı (kapak hex'i). */
+  --kd-accent: #f3c012;
+  --kd-accent-soft: rgba(243, 192, 18, 0.55);
+  --kd-accent-dim: rgba(243, 192, 18, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #050406;
+  color: #ececec;
+  font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #050406;
+}
+
+#app canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* =========================================================
+ * START OVERLAY — Redd kartı, kuantum aksanıyla
+ * ========================================================= */
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  transition: opacity 0.35s ease, background 0.35s ease;
+  z-index: 50;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 2, 4, 0.72) 0%,
+    rgba(2, 2, 4, 0.88) 55%,
+    rgba(0, 0, 0, 0.96) 100%
+  );
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.start-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/**
+ * ESC sonrası pause modu — Redd birebir:
+ * Backdrop SAYDAM ve overlay'in kendisi pointer-events: none. Sadece
+ * pause kartı pointer-events: auto. Böylece arka plandaki UI panelleri
+ * (Album, Harita, HUD) etkileşimde kalır.
+ */
+.start-overlay.is-pause {
+  background: transparent;
+  pointer-events: none;
+  backdrop-filter: none;
+}
+.start-overlay.is-pause .start-overlay__card--pause {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.start-overlay__card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(16, 16, 18, 0.92), rgba(8, 8, 10, 0.92));
+  padding: 2rem 2.4rem 2.1rem;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 500px;
+  box-shadow: 0 40px 96px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(243, 192, 18, 0.08) inset;
+  backdrop-filter: blur(18px);
+  display: none;
+}
+
+/** İntro kartı sadece is-first içinde görünür. */
+.start-overlay.is-first .start-overlay__card--intro {
+  display: block;
+}
+/** Pause kartı sadece is-pause içinde görünür. */
+.start-overlay.is-pause .start-overlay__card--pause {
+  display: block;
+  max-width: 380px;
+  padding: 1.5rem 1.8rem 1.6rem;
+}
+
+.start-overlay__kicker {
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #a3a3a3;
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+}
+
+.start-overlay h2 {
+  margin: 0 0 0.85rem;
+  font-weight: 300;
+  font-size: 1.75rem;
+  letter-spacing: 0.01em;
+  color: #f6f6f6;
+}
+
+.start-overlay__desc {
+  color: #b1b1b1;
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  max-width: 420px;
+}
+
+.start-overlay__controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem 0.75rem;
+  margin: 0 auto 1.1rem;
+  max-width: 360px;
+}
+
+.start-overlay__ctrl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.65rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-size: 0.76rem;
+  color: #cfcfcf;
+}
+
+.start-overlay__ctrl span {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--kd-accent);
+}
+
+.start-overlay__ctrl em {
+  font-style: normal;
+  color: #9a9a9a;
+}
+
+.start-overlay__cta {
+  margin: 0.2rem auto 0;
+  padding: 0.7rem 1.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--kd-accent-soft);
+  background: linear-gradient(180deg, rgba(243, 192, 18, 0.2), rgba(243, 192, 18, 0.08));
+  color: #f4eccf;
+  font-size: 0.88rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  font-family: inherit;
+}
+
+.start-overlay__cta:hover {
+  background: linear-gradient(180deg, rgba(243, 192, 18, 0.32), rgba(243, 192, 18, 0.14));
+  border-color: rgba(243, 192, 18, 0.8);
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+ * HUD — sol üst, kontroller paneli (Redd-style birebir)
+ * ========================================================= */
+.hud {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(8, 8, 8, 0.62);
+  border: 1px solid #262626;
+  padding: 0.55rem 0.85rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  min-width: 240px;
+  z-index: 6;
+  backdrop-filter: blur(4px);
+  transition: padding 0.2s ease, min-width 0.2s ease;
+}
+
+.hud__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.hud__head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hud__kicker {
+  margin: 0;
+  letter-spacing: 0.25em;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #a0a0a0;
+}
+
+.hud__library-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.3rem;
+  margin: 0;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #e8e8e8;
+  cursor: pointer;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  background: rgba(28, 28, 30, 0.95);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hud__library-btn:hover {
+  border-color: var(--kd-accent-soft);
+  background: rgba(36, 32, 16, 0.98);
+}
+
+.hud__library-icon {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--kd-accent);
+}
+
+.hud__library-text {
+  white-space: nowrap;
+}
+
+.hud__collapse {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #303030;
+  color: #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1;
+  padding: 0;
+  font-family: inherit;
+}
+
+.hud__collapse:hover {
+  border-color: #5a5a5a;
+}
+
+.hud.is-collapsed {
+  min-width: 130px;
+  padding: 0.45rem 0.7rem 0.55rem;
+}
+
+.hud.is-collapsed .hud__body {
+  display: none;
+}
+
+.hud.is-collapsed .hud__head {
+  margin-bottom: 0;
+}
+
+.hud__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.14rem 0;
+  color: #cfcfcf;
+}
+
+.hud__row span {
+  color: #e2e2e2;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.hud__row em {
+  color: #8e8e8e;
+  font-style: normal;
+}
+
+.hud__divider {
+  height: 1px;
+  margin: 0.5rem 0 0.45rem;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.hud__row--hint span {
+  color: var(--kd-accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hud__row--hint em {
+  color: #bdb49a;
+  font-size: 0.72rem;
+}
+
+/* =========================================================
+ * MINIMAP — sol alt, Redd-style birebir
+ * ========================================================= */
+.minimap {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  width: 220px;
+  background: rgba(10, 10, 12, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.5rem 0.55rem 0.55rem;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  transition: width 0.25s ease, padding 0.25s ease;
+}
+
+.minimap__head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0 0.25rem 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a1a1a1;
+}
+
+.minimap__scale {
+  color: #7e7e7e;
+  letter-spacing: 0.12em;
+}
+
+.minimap__collapse {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #303030;
+  color: #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1;
+  padding: 0;
+  letter-spacing: 0;
+  font-family: inherit;
+}
+
+.minimap__collapse:hover {
+  border-color: #5a5a5a;
+}
+
+.minimap__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.minimap.is-collapsed {
+  width: auto;
+  min-width: 120px;
+  padding: 0.45rem 0.7rem 0.5rem;
+}
+
+.minimap.is-collapsed .minimap__canvas,
+.minimap.is-collapsed .minimap__scale,
+.minimap.is-collapsed .minimap__legend {
+  display: none !important;
+}
+
+/**
+ * Minimap legend — canvas altı, K=Konum · H=Hız ipucu çifti.
+ * Redd-style key pill ile aksan tonu birebir.
+ */
+.minimap__legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  padding: 0 0.15rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: rgba(235, 235, 240, 0.7);
+}
+.minimap__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ========================
+   Album panel — Redd · Mükemmel Boşluk birebir port
+   Sağ alt panel · YouTube IFrame entegrasyonu · oynatma listesi.
+   ======================== */
+.album-panel {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(360px, 42vw);
+  min-width: 260px;
+  background: rgba(10, 10, 12, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  z-index: 5;
+  transition: width 0.25s ease, height 0.25s ease;
+  pointer-events: auto;
+}
+.album-panel__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(14, 14, 16, 0.8);
+}
+.album-panel__titles { min-width: 0; flex: 1; }
+.album-panel__kicker {
+  margin: 0; letter-spacing: 0.2em; font-size: 0.62rem;
+  text-transform: uppercase; color: #a3a3a3;
+}
+.album-panel__title {
+  margin: 0.15rem 0 0.1rem; font-size: 0.92rem; font-weight: 500;
+  color: #f3f3f3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.album-panel__meta {
+  margin: 0; font-size: 0.72rem; color: #9b9b9b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.album-panel__collapse {
+  flex-shrink: 0; background: rgba(20, 20, 22, 0.9);
+  border: 1px solid #303030; color: #e0e0e0;
+  width: 26px; height: 26px; border-radius: 7px;
+  cursor: pointer; font-size: 0.9rem; line-height: 1;
+  display: grid; place-content: center; padding: 0;
+}
+.album-panel__collapse:hover { border-color: #555; }
+.album-panel__body {
+  display: flex; flex-direction: column; gap: 0.55rem;
+  padding: 0.55rem 0.6rem 0.7rem;
+}
+.album-panel.is-collapsed .album-panel__body { display: none; }
+.album-panel__frame-wrap {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  border-radius: 10px; overflow: hidden; background: #000;
+}
+.album-panel__frame { position: absolute; inset: 0; }
+.album-panel__frame iframe { width: 100%; height: 100%; border: 0; }
+.album-panel__blocker { position: absolute; inset: 0; z-index: 2; cursor: default; }
+.album-panel__fallback {
+  position: absolute; inset: 0; z-index: 3; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.45rem; padding: 0.8rem; text-align: center;
+  background: rgba(6, 6, 8, 0.82); color: #e8e8e8; font-size: 0.78rem;
+}
+.album-panel__fallback.is-visible { display: flex; }
+.album-panel__fallback p { margin: 0; color: #c9c9c9; }
+.album-panel__fallback-btn {
+  background: var(--kd-accent, #f3c012); color: #1a1208; border: 0;
+  padding: 0.5rem 0.9rem; border-radius: 8px; cursor: pointer; font-size: 0.82rem;
+  font-weight: 700;
+}
+.album-panel__fallback a {
+  color: #f4d675; text-decoration: none; font-size: 0.72rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.album-panel__progress {
+  display: flex; flex-direction: column; gap: 0.22rem;
+  padding: 0 0.1rem; user-select: none;
+}
+.album-panel__progress-times {
+  display: flex; justify-content: space-between;
+  font-variant-numeric: tabular-nums; font-size: 0.66rem;
+  color: #a9a9a9; letter-spacing: 0.05em;
+}
+.album-panel__time--total { color: #7c7c7c; }
+.album-panel__bar {
+  position: relative; height: 16px;
+  display: flex; align-items: center; cursor: pointer;
+}
+.album-panel__bar-track {
+  position: absolute; inset: auto 0; height: 4px;
+  border-radius: 4px; background: rgba(255, 255, 255, 0.09);
+  top: 50%; transform: translateY(-50%);
+}
+.album-panel__bar-fill {
+  position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%); height: 4px; width: 0%;
+  background: linear-gradient(90deg, #d9b170 0%, #f4d675 100%);
+  border-radius: 4px; pointer-events: none;
+  transition: width 0.08s linear;
+}
+.album-panel__bar-handle {
+  position: absolute; top: 50%; left: 0%;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #f4d675;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%); pointer-events: none;
+  transition: left 0.08s linear, transform 0.15s ease;
+}
+.album-panel__bar:hover .album-panel__bar-handle {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+.album-panel__controls {
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.album-panel__btn {
+  flex-shrink: 0; width: 34px; height: 34px;
+  display: grid; place-content: center;
+  background: rgba(20, 20, 22, 0.85);
+  border: 1px solid #2e2e2e; color: #ededed;
+  border-radius: 9px; cursor: pointer; font-size: 0.92rem;
+  line-height: 1; padding: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.album-panel__btn:hover {
+  border-color: var(--kd-accent, #f3c012);
+  background: rgba(28, 28, 30, 0.95);
+}
+.album-panel__btn--primary {
+  width: 40px; height: 40px;
+  background: var(--kd-accent, #f3c012);
+  color: #1a1208;
+  border-color: var(--kd-accent, #f3c012);
+}
+.album-panel__btn--primary:hover {
+  background: #ffd84d; border-color: #ffd84d;
+}
+.album-panel__play, .album-panel__pause { display: inline-block; }
+.album-panel .album-panel__pause { display: none; }
+.album-panel.is-playing .album-panel__play { display: none; }
+.album-panel.is-playing .album-panel__pause { display: inline-block; }
+.album-panel__volume { margin-left: auto; display: inline-flex; align-items: center; }
+.album-panel__volume input[type="range"] { width: 90px; accent-color: var(--kd-accent, #f3c012); }
+.album-panel__tracks {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;
+}
+.album-panel__tracks-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 0.15rem; font-size: 0.62rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: #9a9a9a;
+}
+.album-panel__count { color: #777; letter-spacing: 0.12em; }
+.album-panel__list {
+  list-style: none; padding: 0; margin: 0;
+  max-height: 180px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+  scrollbar-width: thin; scrollbar-color: #3a3a3a transparent;
+}
+.album-panel__list::-webkit-scrollbar { width: 6px; }
+.album-panel__list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.album-panel__track {
+  display: grid;
+  grid-template-columns: 28px 1fr 16px 22px;
+  align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.5rem; border-radius: 7px;
+  cursor: pointer; color: #d6d6d6; font-size: 0.78rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.album-panel__track.is-missing {
+  grid-template-columns: 28px 1fr 16px;
+}
+.album-panel__track-eject {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  color: #a8a8a8;
+  font-size: 0.72rem; line-height: 1;
+  cursor: pointer; opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease, transform 0.15s ease;
+  font-family: inherit;
+}
+.album-panel__track:hover .album-panel__track-eject,
+.album-panel__track:focus-within .album-panel__track-eject {
+  opacity: 1;
+}
+.album-panel__track.is-loaded .album-panel__track-eject,
+.album-panel__track.is-active .album-panel__track-eject {
+  opacity: 0.85;
+}
+.album-panel__track-eject:hover {
+  background: rgba(200, 60, 60, 0.18);
+  border-color: rgba(220, 90, 90, 0.55);
+  color: #f4d3d3;
+}
+.album-panel__track-eject:active { transform: translateY(1px); }
+.album-panel__track:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+.album-panel__track.is-active {
+  background: rgba(243, 192, 18, 0.12); color: #fff;
+  box-shadow: inset 2px 0 0 var(--kd-accent, #f3c012);
+}
+.album-panel__track.is-loaded {
+  background: rgba(220, 195, 120, 0.08);
+  color: #f1dfb4;
+  box-shadow: inset 2px 0 0 rgba(220, 195, 120, 0.65);
+}
+.album-panel__track-index {
+  color: #7a7a7a; font-variant-numeric: tabular-nums; font-size: 0.72rem;
+}
+.album-panel__track.is-active .album-panel__track-index { color: #f4d675; }
+.album-panel__track-title {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.album-panel__track-state {
+  text-align: right; color: #d8d8d8; font-size: 0.78rem;
+}
+.album-panel__track.is-loaded .album-panel__track-state { color: #ebcf8a; }
+.album-panel__track.is-missing { cursor: default; opacity: 0.5; }
+.album-panel__track.is-missing:hover { background: transparent; color: inherit; }
+.album-panel__track.is-missing .album-panel__track-title {
+  color: #6b6b6b; font-style: italic; letter-spacing: 0.02em;
+}
+.album-panel__track.is-missing .album-panel__track-state { color: #5a2e30; }
+
+@media (max-width: 720px) {
+  .album-panel {
+    width: min(96vw, 360px);
+    right: 0.5rem; bottom: 0.5rem;
+  }
+}
+
+.minimap__legend kbd {
+  display: inline-grid;
+  place-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.3rem;
+  background: var(--kd-accent);
+  color: #1a1208;
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: inherit;
+  box-shadow: 0 0 0 1px rgba(243, 192, 18, 0.35);
+}
+
+.minimap.is-collapsed .minimap__head {
+  padding-bottom: 0;
+  grid-template-columns: 1fr auto;
+  margin-bottom: 0;
+}
+
+/* =========================================================
+ * MEASUREMENT PILL — minimap'in HEMEN ÜSTÜNDE transient pill
+ * KONUM ölçümünde "X.X m uzakta" gösterir, HIZ'da "X.XX m/s".
+ * ========================================================= */
+/**
+ * Üst-merkez transient pill: KONUM / HIZ snapshot okuma. Heisenberg
+ * ilkesini görselleştirir — sadece bir tanesi anda görünür.
+ */
+.measurement-pill {
+  position: fixed;
+  left: 50%;
+  top: 1.4rem;
+  transform: translate(-50%, -8px);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.55rem 1.1rem 0.6rem;
+  background: rgba(10, 10, 12, 0.86);
+  border: 1px solid var(--kd-accent-soft);
+  border-radius: 999px;
+  color: #f1ead2;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  z-index: 12;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(243, 192, 18, 0.14);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.22s ease;
+}
+
+.measurement-pill.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.measurement-pill.is-velocity {
+  border-color: rgba(255, 220, 90, 0.7);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55),
+    0 0 36px rgba(255, 220, 90, 0.22);
+}
+
+.measurement-pill__label {
+  font-size: 0.62rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--kd-accent);
+  font-weight: 700;
+}
+
+.measurement-pill__value {
+  font-weight: 600;
+  color: #fff5cc;
+  font-size: 0.96rem;
+}
+
+.measurement-pill__sub {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: rgba(241, 234, 210, 0.5);
+  font-style: italic;
+}
+
+/* =========================================================
+ * INTERACTION HINT — alt orta, proximity prompt (Redd birebir)
+ * ========================================================= */
+.interaction-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 19vh;
+  transform: translate(-50%, 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.85rem 0.5rem;
+  background: rgba(8, 8, 10, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: #ededed;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.18s ease;
+  z-index: 4;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.interaction-hint.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.interaction-hint__key {
+  display: inline-grid;
+  place-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 0.45rem;
+  background: var(--kd-accent);
+  color: #1a1208;
+  border-radius: 7px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.82rem;
+  box-shadow: 0 0 0 1px rgba(243, 192, 18, 0.35);
+}
+
+.interaction-hint__text {
+  color: #ebebeb;
+}
+
+/* =========================================================
+ * BRAND FOOTER — alt orta minimal © (Redd birebir)
+ * ========================================================= */
+.brand-footer {
+  position: fixed;
+  left: 50%;
+  bottom: max(0.55rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(235, 235, 240, 0.42);
+  background: rgba(8, 8, 10, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.brand-footer__copy {
+  font-weight: 500;
+  color: rgba(235, 235, 240, 0.5);
+}
+
+.brand-footer__sep {
+  opacity: 0.35;
+}
+
+.brand-footer__by {
+  font-weight: 400;
+}
+
+.brand-footer__by strong {
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.14em;
+  color: rgba(245, 220, 170, 0.78);
+  margin-left: 0.25rem;
+}
+
+/* =========================================================
+ * CROSSHAIR (merkez nokta) — minimal, Redd'de yok ama kuantum'a kalsın
+ * ========================================================= */
+.kd-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--kd-accent);
+  box-shadow: 0 0 10px rgba(243, 192, 18, 0.7);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* =========================================================
+ * CAT NAMEPLATE — 3D dünyaya yapışan
+ * ========================================================= */
+.kd-overlay-mount {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.kd-cat-nameplate {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform: translate(-9999px, -9999px);
+  transition: opacity 0.18s ease;
+  will-change: transform, opacity;
+  z-index: 6;
+}
+
+.kd-cat-nameplate__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 14px 9px;
+  background: rgba(8, 6, 2, 0.88);
+  border: 1px solid var(--kd-accent-soft);
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(243, 192, 18, 0.08) inset;
+  position: relative;
+}
+
+.kd-cat-nameplate__inner::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid var(--kd-accent-soft);
+}
+
+.kd-cat-nameplate__eyebrow {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: rgba(243, 192, 18, 0.75);
+  text-transform: uppercase;
+}
+
+.kd-cat-nameplate__name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #f1edd9;
+}
+
+.kd-cat-nameplate__sub {
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  color: rgba(241, 237, 217, 0.55);
+  text-transform: lowercase;
+  font-style: italic;
+}
+
+/* =========================================================
+ * RESPONSIVE — küçük ekran
+ * ========================================================= */
+@media (max-width: 1100px) {
+  .minimap {
+    width: 190px;
+  }
+}
+
+@media (max-width: 760px) {
+  .minimap {
+    width: 168px;
+  }
+  .hud {
+    font-size: 0.72rem;
+    min-width: 200px;
+  }
+}
+
+/* =============================================================================
+ * MOBİL KONTROLLER — Redd · Mükemmel Boşluk düzeni (aksan: --kd-accent)
+ * ============================================================================= */
+
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: opacity 0.2s ease;
+}
+
+.mobile-controls.is-hidden {
+  opacity: 0;
+  pointer-events: none !important;
+}
+
+.mobile-controls__pad,
+.mobile-controls__action,
+.mobile-controls__tool {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mobile-controls__dpad {
+  position: absolute;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: 168px;
+  height: 168px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.mobile-controls__pad {
+  display: grid;
+  place-content: center;
+  background: rgba(14, 14, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(245, 245, 250, 0.88);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  padding: 0;
+  font: inherit;
+}
+
+.mobile-controls__pad svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.mobile-controls__pad.is-pressed {
+  transform: scale(0.94);
+  background: rgba(243, 192, 18, 0.22);
+  border-color: var(--kd-accent-soft);
+  color: #fff;
+}
+
+.mobile-controls__pad--up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.mobile-controls__pad--left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.mobile-controls__pad--right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.mobile-controls__pad--down {
+  grid-column: 2;
+  grid-row: 3;
+}
+.mobile-controls__pad--run {
+  grid-column: 1;
+  grid-row: 3;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: rgba(240, 240, 250, 0.85);
+}
+
+.mobile-controls__actions--quantum {
+  position: absolute;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: 62px 62px;
+  gap: 8px;
+}
+
+.mobile-controls__action {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 50%;
+  background: rgba(18, 18, 22, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(245, 245, 250, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.mobile-controls__action.is-pressed {
+  transform: scale(0.93);
+  background: rgba(243, 192, 18, 0.22);
+  border-color: var(--kd-accent-soft);
+  color: #fff;
+}
+
+.mobile-controls__action-glyph {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.mobile-controls__action-label {
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  color: rgba(220, 220, 230, 0.7);
+  text-transform: uppercase;
+}
+
+.mobile-controls__actions--quantum .mobile-controls__action--jump {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.mobile-controls__actions--quantum [data-key="KeyK"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.mobile-controls__actions--quantum [data-key="KeyH"] {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.mobile-controls__actions--quantum [data-key="KeyQ"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.mobile-controls__actions--quantum .mobile-controls__action--primary {
+  grid-column: 2 / span 2;
+  grid-row: 2;
+  border-radius: 16px;
+  width: 100%;
+  height: 100%;
+  background: rgba(243, 192, 18, 0.22);
+  border-color: var(--kd-accent-soft);
+}
+
+.mobile-controls__actions--quantum .mobile-controls__action--primary .mobile-controls__action-glyph {
+  color: #fff8dc;
+}
+
+.mobile-controls__actions--quantum .mobile-controls__action--measure {
+  background: rgba(60, 100, 150, 0.22);
+  border-color: rgba(120, 170, 220, 0.42);
+}
+
+.mobile-controls__toolbar {
+  position: fixed;
+  top: max(0.45rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(12, 12, 16, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 4px 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: calc(100vw - 0.9rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  z-index: 50;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.mobile-controls__toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-controls__tool-sep {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+  flex: 0 0 auto;
+}
+
+.mobile-controls__tool {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(235, 235, 245, 0.85);
+  cursor: pointer;
+  padding: 0;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
+    transform 120ms ease;
+}
+
+.mobile-controls__tool--back {
+  color: rgba(243, 220, 150, 0.95);
+}
+
+.mobile-controls__tool svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-controls__tool.is-pressed,
+.mobile-controls__tool:active {
+  background: rgba(243, 192, 18, 0.2);
+  border-color: var(--kd-accent-soft);
+  color: #fff;
+  transform: scale(0.92);
+}
+
+.mobile-controls__tool--pause {
+  margin-left: 2px;
+  background: rgba(200, 60, 60, 0.12);
+  border-color: rgba(200, 60, 60, 0.28);
+}
+
+.mobile-controls__tool-eye-closed {
+  display: none;
+}
+
+body.is-ui-hidden .mobile-controls__tool-eye-open {
+  display: none;
+}
+
+body.is-ui-hidden .mobile-controls__tool-eye-closed {
+  display: inline-block;
+}
+
+.mobile-controls__tool--eye[aria-pressed="true"] {
+  background: rgba(243, 192, 18, 0.2);
+  border-color: var(--kd-accent-soft);
+  color: #fff;
+}
+
+.mobile-controls__tool-fs-enter,
+.mobile-controls__tool-fs-exit {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-controls__tool-fs-exit {
+  display: none;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs .mobile-controls__tool-fs-enter {
+  display: none;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs .mobile-controls__tool-fs-exit {
+  display: inline-block;
+}
+
+body.is-fullscreen .mobile-controls__tool--fs[aria-pressed="true"] {
+  background: rgba(243, 192, 18, 0.2);
+  border-color: var(--kd-accent-soft);
+  color: #fff;
+}
+
+body.is-ui-hidden .mobile-controls__dpad,
+body.is-ui-hidden .mobile-controls__actions,
+body.is-ui-hidden .minimap,
+body.is-ui-hidden .album-panel,
+body.is-ui-hidden .hud,
+body.is-ui-hidden .brand-footer,
+body.is-ui-hidden .interaction-hint,
+body.is-ui-hidden .measurement-pill,
+body.is-ui-hidden .kd-crosshair {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 160ms ease;
+}
+
+body.is-ui-hidden .mobile-controls__toolbar > .mobile-controls__tool:not(.mobile-controls__tool--eye) {
+  display: none;
+}
+
+body.is-ui-hidden .mobile-controls__toolbar {
+  background: rgba(12, 12, 16, 0.5);
+  padding: 3px;
+}
+
+body.is-touch {
+  min-height: 100vh;
+  min-height: 100dvh;
+  touch-action: none;
+  overscroll-behavior: none;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+body.is-touch #app,
+body.is-touch #experience {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body.is-touch .hud {
+  display: none !important;
+}
+
+body.is-touch .minimap {
+  left: max(0.35rem, env(safe-area-inset-left));
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 100px);
+  bottom: auto;
+  right: auto;
+  width: 128px;
+  padding: 0.3rem 0.38rem 0.35rem;
+  z-index: 18;
+  background: rgba(10, 10, 12, 0.72);
+}
+
+body.is-touch .minimap.is-collapsed {
+  display: none !important;
+}
+
+body.is-touch .minimap__head {
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  padding: 0 0.18rem 0.22rem;
+}
+
+body.is-touch .minimap__canvas {
+  width: 100%;
+  height: auto;
+}
+
+body.is-touch .album-panel {
+  left: auto;
+  right: max(0.35rem, env(safe-area-inset-right));
+  top: calc(max(0.35rem, env(safe-area-inset-top)) + 100px);
+  bottom: auto;
+  width: min(240px, 62vw);
+  min-width: 180px;
+  max-height: calc(
+    100dvh - max(0.35rem, env(safe-area-inset-top)) - 100px - 170px
+  );
+  display: flex;
+  flex-direction: column;
+  z-index: 22;
+  padding: 0;
+  border-radius: 10px;
+}
+
+body.is-touch .album-panel__kicker,
+body.is-touch .album-panel__meta,
+body.is-touch .album-panel__frame-wrap,
+body.is-touch .album-panel__progress,
+body.is-touch .album-panel__controls,
+body.is-touch .album-panel__tracks-head {
+  display: none !important;
+}
+
+body.is-touch .album-panel__title {
+  font-size: 0.82rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.is-touch .album-panel__collapse {
+  width: 24px;
+  height: 24px;
+  font-size: 0.95rem;
+}
+
+body.is-touch .album-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0.35rem 0.4rem;
+  gap: 0.3rem;
+}
+
+body.is-touch .album-panel__tracks {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+body.is-touch .album-panel__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: 0.25rem 0.15rem 0.3rem;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+body.is-touch .album-panel__track {
+  padding: 0.42rem 0.5rem;
+  font-size: 0.72rem;
+  gap: 0.4rem;
+}
+
+body.is-touch .album-panel__track-index {
+  font-size: 0.58rem;
+  min-width: 1.4ch;
+}
+
+body.is-touch .album-panel.is-collapsed {
+  display: none !important;
+}
+
+body.is-touch .minimap,
+body.is-touch .album-panel {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+body.is-touch .interaction-hint {
+  bottom: calc(max(0.4rem, env(safe-area-inset-bottom)) + 172px);
+  font-size: 0.7rem;
+  padding: 0.38rem 0.65rem 0.36rem;
+  max-width: 72vw;
+  text-align: center;
+}
+
+body.is-touch .measurement-pill {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + 56px);
+  max-width: min(92vw, 420px);
+  padding: 0.42rem 0.85rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+body.is-touch .brand-footer {
+  font-size: 0.56rem;
+  padding: 0.2rem 0.6rem;
+  letter-spacing: 0.1em;
+  gap: 0.38rem;
+  background: rgba(8, 8, 10, 0.55);
+}
+
+body.is-touch.is-in-experience:not(.is-overlay-open) .brand-footer {
+  display: none !important;
+}
+
+body.is-touch .start-overlay__card {
+  padding: 1.2rem 1.1rem 1.05rem;
+  max-width: min(420px, 88vw);
+  max-height: 92dvh;
+  overflow-y: auto;
+  border-radius: 16px;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+body.is-touch .start-overlay h2 {
+  font-size: 1.3rem;
+}
+
+body.is-touch .start-overlay__desc {
+  font-size: 0.8rem;
+}
+
+body.is-touch .start-overlay__controls {
+  gap: 0.28rem 0.45rem;
+}
+
+body.is-touch .start-overlay__ctrl {
+  padding: 0.32rem 0.5rem;
+  font-size: 0.66rem;
+}
+
+body.is-touch .start-overlay__cta {
+  padding: 0.85rem 1.4rem;
+  font-size: 0.88rem;
+  letter-spacing: 0.1em;
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  body.is-touch .mobile-controls__dpad {
+    width: 152px;
+    height: 152px;
+    left: max(0.5rem, env(safe-area-inset-left));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  body.is-touch .mobile-controls__actions--quantum {
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: 56px 56px;
+    gap: 7px;
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  body.is-touch .mobile-controls__toolbar {
+    top: max(0.4rem, env(safe-area-inset-top));
+    gap: 5px;
+    padding: 3px 5px;
+  }
+
+  body.is-touch .mobile-controls__tool {
+    width: 36px;
+    height: 36px;
+  }
+
+  body.is-touch .album-panel {
+    width: min(220px, 58vw);
+    max-height: calc(
+      100dvh - max(0.35rem, env(safe-area-inset-top)) - 102px - 182px
+    );
+  }
+
+  body.is-touch .minimap {
+    width: 118px;
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 102px);
+  }
+
+  body.is-touch .interaction-hint {
+    bottom: calc(max(0.4rem, env(safe-area-inset-bottom)) + 178px);
+    max-width: 86vw;
+  }
+}
+
+@media (max-width: 1000px) and (max-height: 520px) and (orientation: landscape) {
+  body.is-touch .mobile-controls__dpad {
+    width: 138px;
+    height: 138px;
+    left: max(0.45rem, env(safe-area-inset-left));
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  body.is-touch .mobile-controls__actions--quantum {
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: 52px 52px;
+    gap: 6px;
+    right: max(0.45rem, env(safe-area-inset-right));
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+  }
+
+  body.is-touch .mobile-controls__action-glyph {
+    font-size: 0.95rem;
+  }
+
+  body.is-touch .mobile-controls__action-label {
+    font-size: 0.46rem;
+    letter-spacing: 0.16em;
+  }
+
+  body.is-touch .mobile-controls__pad svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  body.is-touch .mobile-controls__toolbar {
+    top: max(0.3rem, env(safe-area-inset-top));
+    gap: 4px;
+    padding: 2px 4px;
+  }
+
+  body.is-touch .mobile-controls__tool {
+    width: 32px;
+    height: 32px;
+  }
+
+  body.is-touch .mobile-controls__tool svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  body.is-touch .minimap {
+    width: 110px;
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 86px);
+  }
+
+  body.is-touch .album-panel {
+    width: min(220px, 42vw);
+    min-width: 170px;
+    top: calc(max(0.3rem, env(safe-area-inset-top)) + 86px);
+    max-height: calc(
+      100dvh - max(0.3rem, env(safe-area-inset-top)) - 86px - 148px
+    );
+  }
+
+  body.is-touch .interaction-hint {
+    bottom: calc(max(0.35rem, env(safe-area-inset-bottom)) + 156px);
+  }
+
+  body.is-touch .measurement-pill {
+    top: calc(max(0.35rem, env(safe-area-inset-top)) + 48px);
+  }
+}
