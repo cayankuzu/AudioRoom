@@ -8,6 +8,7 @@ import { createMovementSystem } from "../systems/movementSystem";
 import { createMeasurementSystem } from "../systems/measurementSystem";
 import { createRoom } from "../world/room";
 import { createWaveFloor } from "../world/waveFloor";
+import { createDaisyField } from "../world/daisyField";
 import { createParticles } from "../world/particles";
 import { createCenterPiece } from "../world/centerPiece";
 import { createGramophone } from "../world/gramophone";
@@ -76,6 +77,9 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   /** ── Dünya ───────────────────────────────────────────────────── */
   createRoom(scene);
   const waveFloor = createWaveFloor(scene);
+  const daisyField = createDaisyField(scene, waveFloor, {
+    enabled: !input.isTouch,
+  });
   /** İki katmanlı atmosfer tozu — `WORLD.half` ile ölçeklenir. */
   const particles = createParticles(scene);
   const center = createCenterPiece(scene);
@@ -334,7 +338,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
 
     /** Önce zemini güncelle ki diğer sistemler doğru getHeightAt() okusun. */
     waveFloor.update(time);
-
+    daisyField.update(time);
     movement.update(delta, waveFloor.getHeightAt, (sx, sz) => {
       waveFloor.addRipple(sx, sz, time);
     });
@@ -478,6 +482,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       pill?.dispose();
       albumPanel?.dispose();
       cat.dispose();
+      daisyField.dispose();
       scene.remove(particles.group);
       renderer.dispose();
       renderer.domElement.parentElement?.removeChild(renderer.domElement);

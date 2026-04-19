@@ -62,7 +62,7 @@ export function createParticles(
   options: { count?: number; radius?: number; ceil?: number } = {},
 ): ParticlesHandle {
   const half = WORLD.half;
-  const countFine = options.count ?? 620;
+  const countFine = options.count ?? 160;
   const radius = options.radius ?? Math.min(half * 0.88, 155);
   const ceil = options.ceil ?? Math.min(WORLD.ceilingHeight * 0.82, 34);
 

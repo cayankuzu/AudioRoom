@@ -6,11 +6,12 @@ import * as THREE from "three";
  */
 export function createRenderer(container: HTMLElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: false,
     powerPreference: "high-performance",
     stencil: false,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.85));
+  /** Fill-rate ve shader maliyeti: 1.0 DPR zayıf donanımda en güvenli. */
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;

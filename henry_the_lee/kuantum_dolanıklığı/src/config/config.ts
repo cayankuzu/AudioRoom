@@ -46,15 +46,14 @@ export function applyWorldScaleForInput(isTouch: boolean): void {
 
 /**
  * Kuantum zemin — sürekli dalgalanan sıvı yüzey + ayak izi tepkisi.
- *  - Plane segmentleri: 96 × 96 (≈ 9.4k köşe). CPU vertex displacement
- *    `getHeightAt()` ile aynı denklemden gelir; oyuncu/objeler dalgayı
- *    birebir takip eder.
+ *  - Plane segmentleri düşük tutulur (48² köşe). Bump köşe başına ön
+ *    hesaplanır; normal güncellemesi ızgara türevi + her 2. kare.
  *  - Ripple sistemi: oyuncu adım attıkça yere damla bırakır; halka şeklinde
  *    yayılarak söner.
  */
 export const FLOOR = {
-  /** Yüzey segment sayısı (her eksende) — kısa dalga boylarına izin verir. */
-  segments: 180,
+  /** Yüzey segment sayısı — düşük = çok daha az CPU (49² köşe @ 48). */
+  segments: 48,
   /** Taban yüksekliği — dalganın "0" referansı. */
   baseY: 0,
   /**
