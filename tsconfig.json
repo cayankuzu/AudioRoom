@@ -19,11 +19,12 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.d.ts",
-    "henry_the_lee/**/src/**/*.ts"
+    "depo/henry_the_lee/**/src/**/*.ts",
+    "depo/hayko_cepkin/**/src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "redd/mukemmel_bosluk/node_modules",
-    "redd/mukemmel_bosluk/src"
+    "depo/redd/mukemmel_bosluk/node_modules",
+    "depo/redd/mukemmel_bosluk/src"
   ]
 }
