@@ -14,7 +14,7 @@ export interface FigureHandle {
   update(time: number, delta: number): void;
 }
 
-const MODEL_URL = `${import.meta.env.BASE_URL}assets/models/levitation.glb`;
+const MODEL_URL = "/assets/models/levitation.glb";
 
 const DAY_BG = new THREE.Color("#bfbfc1");
 const NIGHT_BG = new THREE.Color("#0d0f12");
