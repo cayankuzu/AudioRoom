@@ -14,8 +14,13 @@ export interface Text3DHandle {
   update(time: number, delta: number): void;
 }
 
-const FONT_REGULAR_URL = "/assets/fonts/gentilis_regular.typeface.json";
-const FONT_BOLD_URL = "/assets/fonts/gentilis_bold.typeface.json";
+/**
+ * Font'lar kök `public/assets/fonts/` altında. Göreli URL → `document.baseURI`
+ * (Redd HTML) üzerinden çözülür, bu sayede hem dev hem GitHub Pages
+ * (`/AudioRoom/` alt yolu) altında doğru adresi verir.
+ */
+const FONT_REGULAR_URL = "../../../assets/fonts/gentilis_regular.typeface.json";
+const FONT_BOLD_URL = "../../../assets/fonts/gentilis_bold.typeface.json";
 
 interface TextStyle {
   size: number;

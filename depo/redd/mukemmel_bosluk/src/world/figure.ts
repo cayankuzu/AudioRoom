@@ -14,7 +14,16 @@ export interface FigureHandle {
   update(time: number, delta: number): void;
 }
 
-const MODEL_URL = "/assets/models/levitation.glb";
+/**
+ * Asset kökü kök `public/` içinde tutulur (`public/assets/models/levitation.glb`).
+ * Göreli URL olarak bırakıldığında Three.js / tarayıcı bunu `document.baseURI`
+ * (yani Redd HTML sayfasının URL'i) üzerinden çözer:
+ *   - Dev   : `http://localhost:5173/depo/redd/mukemmel_bosluk/` + `../../../...`
+ *   - Pages : `https://user.github.io/AudioRoom/depo/redd/mukemmel_bosluk/`
+ *     + `../../../...` → `https://user.github.io/AudioRoom/assets/...`
+ * Absolute `/assets/...` yazmak Pages alt yolunda kırıldığından göreli kullanıyoruz.
+ */
+const MODEL_URL = "../../../assets/models/levitation.glb";
 
 const DAY_BG = new THREE.Color("#bfbfc1");
 const NIGHT_BG = new THREE.Color("#0d0f12");
