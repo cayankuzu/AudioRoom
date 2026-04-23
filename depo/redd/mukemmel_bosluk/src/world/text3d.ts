@@ -15,12 +15,23 @@ export interface Text3DHandle {
 }
 
 /**
- * Font'lar kök `public/assets/fonts/` altında. Göreli URL → `document.baseURI`
- * (Redd HTML) üzerinden çözülür, bu sayede hem dev hem GitHub Pages
- * (`/AudioRoom/` alt yolu) altında doğru adresi verir.
+ * Font'lar kök `public/assets/fonts/` altında. URL'i çalışma zamanında
+ * `document.baseURI` (Redd HTML) üzerinden mutlak biçimde çözüyoruz — hem
+ * dev (`/assets/...`) hem GitHub Pages (`/AudioRoom/assets/...`) altında
+ * doğru adresi verir, üçüncü parti loader'lar `setPath`/`manager.resolveURL`
+ * nedeniyle göreli stringleri başka bir kök altında çözmeye çalışsa bile
+ * bu mutlak URL'ler garanti şekilde aynı kalır.
  */
-const FONT_REGULAR_URL = "../../../assets/fonts/gentilis_regular.typeface.json";
-const FONT_BOLD_URL = "../../../assets/fonts/gentilis_bold.typeface.json";
+const FONTS_BASE: string =
+  typeof document !== "undefined" ? document.baseURI : "/";
+const FONT_REGULAR_URL = new URL(
+  "../../../assets/fonts/gentilis_regular.typeface.json",
+  FONTS_BASE,
+).href;
+const FONT_BOLD_URL = new URL(
+  "../../../assets/fonts/gentilis_bold.typeface.json",
+  FONTS_BASE,
+).href;
 
 interface TextStyle {
   size: number;

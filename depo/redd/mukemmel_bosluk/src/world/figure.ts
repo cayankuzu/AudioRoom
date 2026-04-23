@@ -15,15 +15,20 @@ export interface FigureHandle {
 }
 
 /**
- * Asset kökü kök `public/` içinde tutulur (`public/assets/models/levitation.glb`).
- * Göreli URL olarak bırakıldığında Three.js / tarayıcı bunu `document.baseURI`
- * (yani Redd HTML sayfasının URL'i) üzerinden çözer:
- *   - Dev   : `http://localhost:5173/depo/redd/mukemmel_bosluk/` + `../../../...`
- *   - Pages : `https://user.github.io/AudioRoom/depo/redd/mukemmel_bosluk/`
- *     + `../../../...` → `https://user.github.io/AudioRoom/assets/...`
- * Absolute `/assets/...` yazmak Pages alt yolunda kırıldığından göreli kullanıyoruz.
+ * `public/assets/models/levitation.glb` kök `public/` içindeki statik asset.
+ * URL'i çalışma zamanında `document.baseURI` (Redd HTML sayfasının kendi URL'i)
+ * üzerinden mutlak biçimde çözüyoruz — bu sayede:
+ *   - Dev  : `http://localhost:5173/depo/redd/mukemmel_bosluk/` → `.../assets/...`
+ *   - Pages: `https://user.github.io/AudioRoom/depo/redd/mukemmel_bosluk/`
+ *           → `https://user.github.io/AudioRoom/assets/...`
+ * Three.js FileLoader'ı relative stringi `document.baseURI` ile çözer ama bazı
+ * ortamlarda (hydration / service worker) `baseURI` geç set edildiği için
+ * inşa anında mutlak href üretiyoruz.
  */
-const MODEL_URL = "../../../assets/models/levitation.glb";
+const MODEL_URL = new URL(
+  "../../../assets/models/levitation.glb",
+  typeof document !== "undefined" ? document.baseURI : "/",
+).href;
 
 const DAY_BG = new THREE.Color("#bfbfc1");
 const NIGHT_BG = new THREE.Color("#0d0f12");
