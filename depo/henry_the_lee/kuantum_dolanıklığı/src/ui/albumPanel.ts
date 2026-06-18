@@ -2,10 +2,10 @@ import { ALBUM } from "../config/config";
 
 /**
  * ALBUM PANEL — Redd · Mükemmel Boşluk ile birebir UI/UX, Henry the Lee için
- * tek-parça versiyona uyarlandı.
+ * tek-parça ve sabit video versiyonuna uyarlandı.
  *
  * Davranış:
- *  - YouTube IFrame API ile playlist (RDqcOZtrA6eEk = ana parça radyo mix'i).
+ *  - YouTube IFrame API ile tek video (qcOZtrA6eEk) açılır.
  *  - Plak gramofona TAKILMADIKÇA müzik başlamaz.
  *    `setActive(true)` çağrısı ile çalmaya hazır olur.
  *    `setActive(false)` plak çıkarıldığında müziği durdurur (pause, başa sar,
@@ -290,12 +290,10 @@ export function createAlbumPanel(
       height: "100%",
       /**
        * KURAL: Müzik plak takılmadan başlamaz.
-       * - autoplay 0 + muted: liste sadece "cue" edilir.
+       * - autoplay 0 + muted: video sadece "cue" edilir.
        * - Plak gramofona girince setActive(true) → playVideo()
        */
       playerVars: {
-        listType: "playlist",
-        list: ALBUM.playlistId,
         autoplay: 0,
         controls: 0,
         rel: 0,
@@ -309,7 +307,7 @@ export function createAlbumPanel(
         onReady: () => {
           state.ready = true;
           state.userVolume = Math.max(0, Math.min(100, Number(volumeInput.value)));
-          safeCall(() => player!.cuePlaylist({ listType: "playlist", list: ALBUM.playlistId }), undefined);
+          safeCall(() => player!.cueVideoById({ videoId: ALBUM.videoId }), undefined);
           safeCall(() => player!.mute(), undefined);
           updateMuteUi(true);
           updatePlayingUi(false);
@@ -343,11 +341,11 @@ export function createAlbumPanel(
   });
   prevBtn.addEventListener("click", () => {
     if (!player || !state.ready || !state.active) return;
-    safeCall(() => player!.previousVideo(), undefined);
+    safeCall(() => player!.seekTo(0, true), undefined);
   });
   nextBtn.addEventListener("click", () => {
     if (!player || !state.ready || !state.active) return;
-    safeCall(() => player!.nextVideo(), undefined);
+    safeCall(() => player!.seekTo(0, true), undefined);
   });
   stopBtn.addEventListener("click", () => {
     if (!player || !state.ready) return;

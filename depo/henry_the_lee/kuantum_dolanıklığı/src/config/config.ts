@@ -315,19 +315,18 @@ export const PALETTE = {
 
 /**
  * Albüm meta — tek parça: "Kuantum Dolanıklık" (kullanıcı talebiyle başlık
- * şarkı adı olarak kullanılıyor; radyo mix sonrası ek parçalar otomatik gelir).
- * YouTube radyo mix listesi (`RDqcOZtrA6eEk`) ile ana parça öncelikli olarak
- * çalınır; mix sürer.
+ * şarkı adı olarak kullanılıyor).
+ * YouTube tarafında ilk parça sabit video ID ile açılır; radio mix seed'i
+ * ilk şarkıyı kaydırabildiği için player doğrudan video ile başlar.
  */
 export const ALBUM = {
   artist: "Henry the Lee",
   title: "Kuantum Dolanıklık",
   trackTitle: "Kuantum Dolanıklık",
   videoId: "qcOZtrA6eEk",
-  /** YouTube otomatik radyo mix id (RD + videoId). */
+  /** YouTube radyo mix id (yedek bilgi); player sabit video ile açılır. */
   playlistId: "RDqcOZtrA6eEk",
-  playlistUrl:
-    "https://www.youtube.com/watch?v=qcOZtrA6eEk&list=RDqcOZtrA6eEk&start_radio=1",
+  playlistUrl: "https://www.youtube.com/watch?v=qcOZtrA6eEk",
 } as const;
 
 /**
