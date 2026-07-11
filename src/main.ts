@@ -1,6 +1,7 @@
-import { renderHub } from "./hub/hub";
+import { bootstrapApp } from "./app/bootstrap";
 
 const root = document.querySelector<HTMLDivElement>("#app");
+
 if (root) {
-  renderHub(root);
+  bootstrapApp(root);
 }

@@ -1,6 +1,13 @@
 import { createBrandFooter } from "../ui/brandFooter";
 import { createLoadingOverlay } from "../ui/loadingOverlay";
-import { createRotateHint } from "../ui/rotateHint";
+import { createStartOverlay } from "../ui/startOverlay";
+import { bindExperienceGate } from "../../../../shared/app/experienceGate";
+import {
+  isFullscreen,
+  isFullscreenSupported,
+  requestFullscreen,
+  tryHideMobileAddressBar,
+} from "../utils/fullscreen";
 import { startExperience } from "./gameLoop";
 
 /**
@@ -14,13 +21,6 @@ import { startExperience } from "./gameLoop";
 export function bootstrapApp(root: HTMLElement): void {
   root.innerHTML = "";
 
-  const rotateHint = createRotateHint(document.body, {
-    initialDelayMs: 2500,
-    intervalMs: 5000,
-    visibleMs: 2400,
-  });
-  rotateHint.start();
-
   createBrandFooter(document.body);
 
   const loader = createLoadingOverlay(document.body);
@@ -30,9 +30,23 @@ export function bootstrapApp(root: HTMLElement): void {
     window.requestAnimationFrame(() => {
       const container = document.createElement("div");
       container.id = "experience";
+      container.style.position = "fixed";
+      container.style.inset = "0";
       root.appendChild(container);
       try {
-        startExperience(container);
+        const experience = startExperience(container);
+        const overlay = createStartOverlay(document.body);
+
+        bindExperienceGate({
+          overlay,
+          experience,
+          fullscreen: {
+            isFullscreen,
+            isFullscreenSupported,
+            requestFullscreen,
+            tryHideMobileAddressBar,
+          },
+        });
       } finally {
         window.requestAnimationFrame(() => {
           window.setTimeout(() => loader.hide(), 200);

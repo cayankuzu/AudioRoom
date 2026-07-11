@@ -1,3 +1,5 @@
+import { readInputDeviceProfile } from "../../../../shared/app/inputDeviceProfile";
+
 export interface InputHandle {
   pressed: Set<string>;
   look: { x: number; y: number };
@@ -30,12 +32,7 @@ export interface InputHandle {
 }
 
 function detectTouch(): boolean {
-  if (typeof window === "undefined") return false;
-  const coarse =
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-  const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-  return coarse || hasTouch;
+  return readInputDeviceProfile().usesTouchUi;
 }
 
 export function createInput(target: HTMLElement): InputHandle {

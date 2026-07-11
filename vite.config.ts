@@ -28,10 +28,19 @@ export default defineConfig({
       "depo/henry_the_lee/kuantum_dolanıklığı/index.html",
       "depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/index.html",
     ],
+    exclude: ["three", "troika-three-text"],
   },
   server: {
     host: true,
     port: 5173,
+    watch: {
+      ignored: [
+        "**/*-check.png",
+        "**/*-portrait.png",
+        "**/*-landscape.png",
+        "**/vite-*.log",
+      ],
+    },
     fs: {
       allow: [".."],
     },

@@ -25,6 +25,14 @@
   --bbs-amber: #f0a060;
   --bbs-cream: #fbe4c8;
   --bbs-blood: #1a0604;
+  --shell-accent: #f0a060;
+  --shell-accent-soft: rgba(240, 160, 96, 0.52);
+  --shell-accent-dim: rgba(240, 160, 96, 0.18);
+  --shell-surface: rgba(20, 6, 4, 0.74);
+  --shell-surface-strong: rgba(10, 3, 2, 0.92);
+  --shell-text: #fbe4c8;
+  --shell-text-muted: rgba(251, 228, 200, 0.62);
+  --shell-line: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -1424,4 +1432,3 @@ body.is-touch .album-panel__volume input[type="range"] { width: 60px; }
   background: rgba(214, 90, 54, 0.4);
   border-color: var(--bbs-amber);
 }
-

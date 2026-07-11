@@ -3,6 +3,14 @@
   color: #ececec;
   background: #080808;
   color-scheme: dark;
+  --shell-accent: #f4d675;
+  --shell-accent-soft: rgba(244, 214, 117, 0.56);
+  --shell-accent-dim: rgba(244, 214, 117, 0.18);
+  --shell-surface: rgba(10, 10, 14, 0.72);
+  --shell-surface-strong: rgba(6, 6, 8, 0.92);
+  --shell-text: #f7f2e7;
+  --shell-text-muted: rgba(247, 242, 231, 0.62);
+  --shell-line: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -3053,4 +3061,3 @@ body.is-ui-hidden .mobile-controls__toolbar {
   background: rgba(12, 12, 16, 0.5);
   padding: 3px;
 }
-

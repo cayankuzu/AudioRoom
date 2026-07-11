@@ -36,7 +36,6 @@ import {
 import { createAmbientAudio } from "../audio/ambientAudio";
 import { createInventory } from "../state/inventory";
 
-import { createStartOverlay } from "../ui/startOverlay";
 import { createHud } from "../ui/hud";
 import { createAlbumPlayerPanel } from "../ui/albumPlayerPanel";
 import { createBrightnessControl } from "../ui/brightnessControl";
@@ -44,7 +43,6 @@ import { createCaptureControls } from "../ui/captureControls";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 import { createMobileControls } from "../ui/mobileControls";
-import { createPcHintBanner } from "../ui/pcHintBanner";
 import {
   exitFullscreen,
   isFullscreen,
@@ -54,7 +52,14 @@ import {
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
 
-export function startExperience(container: HTMLElement): void {
+export interface ExperienceHandle {
+  requestLock(): void;
+  releaseLock(): void;
+  onLockChange(cb: (locked: boolean) => void): () => void;
+  dispose(): void;
+}
+
+export function startExperience(container: HTMLElement): ExperienceHandle {
   /** --- Oturum bazlı seed: her yüklemede dünya farklı ama mantıklı dizilir. --- */
   const sessionSeed = resolveSessionSeed();
   console.log("[Session]", "seed =", sessionSeed);
@@ -179,7 +184,6 @@ export function startExperience(container: HTMLElement): void {
   const audioDistance = createAudioDistanceSystem();
 
   const hud = createHud(container, { showLibraryBack: true, libraryHref: "../../../" });
-  const startOverlay = createStartOverlay(container);
   const albumPanel = createAlbumPlayerPanel(container, inventory, {
     /**
      * Paneldeki ⏏ butonu ile bir plak koleksiyondan çıkarıldığında
@@ -293,7 +297,6 @@ export function startExperience(container: HTMLElement): void {
    * album panel, bright-panel, capture-panel) yatay telefonda sığacak
    * şekilde kompakt moduna alır.
    */
-  const pcHintBanner = input.isTouch ? createPcHintBanner(container) : null;
   let unwatchFullscreen: (() => void) | null = null;
 
   /**
@@ -517,65 +520,12 @@ export function startExperience(container: HTMLElement): void {
     albumPanel.refreshInventory();
   });
 
-  startOverlay.onStart(async () => {
+  const offMobileLock = input.onLockChange((locked) => {
     /**
-     * MOBİL · TAM EKRAN ZORUNLU
-     *
-     * Fullscreen API'si desteklenen cihazlarda (Android Chrome, Edge,
-     * Samsung Internet, iPad Safari, masaüstü tarayıcıları vs.) oyunun
-     * başlaması fullscreen'e geçmeye bağlı. Kullanıcı reddederse oyun
-     * başlamaz; overlay açık kalır ve "bir daha dene" gibi çalışır.
-     *
-     * iOS iPhone'da Fullscreen API yoktur — `isFullscreenSupported()`
-     * false döner; burada istisnaen scroll-trick ile adres barını
-     * gizleyip oyunu başlatıyoruz (aksi halde iPhone kullanıcıları
-     * kilitlenir).
+     * Mobilde duraklayınca kontrolleri gizle — pause kartını tıklaması
+     * yanlışlıkla D-pad'e değmesin.
      */
-    if (input.isTouch) {
-      if (isFullscreenSupported()) {
-        if (!isFullscreen()) {
-          try {
-            await requestFullscreen(document.documentElement);
-          } catch {
-            /** Reddedildi veya başarısız — overlay açık kalsın, oyuna geçme. */
-            return;
-          }
-          /** Double-check: bazı tarayıcılarda reject gelmeden de FS girişi olmaz. */
-          if (!isFullscreen()) return;
-        }
-      } else {
-        /** iOS iPhone fallback — scroll ile adres barını gizle, yine de başlat. */
-        tryHideMobileAddressBar();
-      }
-    }
-    input.requestLock();
-    /**
-     * İlk user-gesture — WebAudio AudioContext'i ayağa kaldırılabilir.
-     * Müzik değil, yalnızca ortam rüzgarı. Çok düşük seviye.
-     */
-    ambient.start();
-  });
-
-  input.onLockChange((locked) => {
-    if (locked) {
-      startOverlay.hide();
-      mobileControls?.setVisible(true);
-      pcHintBanner?.start();
-    } else {
-      startOverlay.show();
-      /**
-       * Mobilde duraklayınca kontrolleri gizle — pause kartını tıklaması
-       * yanlışlıkla D-pad'e değmesin.
-       */
-      mobileControls?.setVisible(false);
-      pcHintBanner?.stop();
-    }
-  });
-
-  renderer.domElement.addEventListener("click", () => {
-    if (!startOverlay.isVisible()) {
-      input.requestLock();
-    }
+    mobileControls?.setVisible(locked);
   });
 
   const resize = () => {
@@ -707,7 +657,43 @@ export function startExperience(container: HTMLElement): void {
 
     post.tick(time);
     post.composer.render();
-    requestAnimationFrame(animate);
+    raf = requestAnimationFrame(animate);
   }
-  animate();
+  let raf = requestAnimationFrame(animate);
+  const requestExperienceLock = () => {
+    ambient.start();
+    input.requestLock();
+  };
+
+  return {
+    requestLock: requestExperienceLock,
+    releaseLock: () => input.releaseLock(),
+    onLockChange: (cb) => input.onLockChange(cb),
+    dispose() {
+      cancelAnimationFrame(raf);
+      offMobileLock();
+      unwatchFullscreen?.();
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", tryHideMobileAddressBar);
+      document.removeEventListener("keydown", onKeyDown);
+      mobileControls?.dispose();
+      captureControls.dispose();
+      brightness.dispose();
+      albumPanel.dispose();
+      interactionHint.dispose();
+      minimap.dispose();
+      hud.dispose();
+      ambient.dispose();
+      input.dispose();
+      document.body.classList.remove(
+        "is-in-experience",
+        "is-touch",
+        "is-fullscreen",
+        "is-overlay-open",
+        "is-ui-hidden",
+      );
+      renderer.dispose();
+      renderer.domElement.remove();
+    },
+  };
 }
