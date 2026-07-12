@@ -15,6 +15,7 @@ import {
   toggleFilterValue,
   type LibraryFilters,
 } from "./catalog";
+import { renderLibraryEngagementBar } from "./renderLibraryEngagementBar";
 import { renderLibraryFooter } from "./renderLibraryFooter";
 import { createAlbumHref } from "./router";
 
@@ -46,6 +47,8 @@ const DRAG_ROTATION_FACTOR = 0.22;
 const WHEEL_ROTATION_FACTOR = 0.08;
 const DRAG_THRESHOLD = 8;
 const PROFILE_POPOVER_TIMEOUT_MS = 2200;
+const PORTRAIT_HINT_INTERVAL_MS = 3000;
+const PORTRAIT_HINT_VISIBLE_MS = 1000;
 const RELEASE_TYPES: readonly LibraryReleaseType[] = ["album", "single", "ep"];
 const AVAILABILITY_OPTIONS: readonly LibraryAvailability[] = [
   "available",
@@ -302,6 +305,16 @@ export function renderLibraryHome(
                   ${escapeHtml(ui.actions.randomize)}
                 </button>
               </div>
+              <aside
+                class="orbit-mobile-toast"
+                data-portrait-toast
+                aria-live="polite"
+                aria-hidden="true"
+                hidden
+              >
+                <strong>${escapeHtml(ui.mobileHints.orientationTitle)}</strong>
+                <span>${escapeHtml(ui.mobileHints.orientationDescription)}</span>
+              </aside>
             `
             : `
               <article class="showcase-empty">
@@ -338,8 +351,13 @@ export function renderLibraryHome(
   const ring = shell.querySelector<HTMLElement>("[data-orbit-ring]");
   const randomizeButton =
     shell.querySelector<HTMLButtonElement>("[data-randomize-button]");
+  const portraitToast =
+    shell.querySelector<HTMLElement>("[data-portrait-toast]");
 
   let profileTimeout = 0;
+  let portraitToastInterval = 0;
+  let portraitToastHideTimeout = 0;
+  let resizeAnimationFrame = 0;
 
   if (input) {
     input.value = state.query;
@@ -537,6 +555,7 @@ export function renderLibraryHome(
             ui.trackCountLabel(experience.trackCount),
           )}
         </p>
+        ${renderLibraryEngagementBar("card")}
       </div>
     `;
     ring.appendChild(link);
@@ -568,20 +587,31 @@ export function renderLibraryHome(
     const count = experiences.length;
     const step = 360 / count;
     const viewportWidth = viewport.clientWidth;
+    const isPhoneViewport = viewportWidth <= 520;
     const isCompactViewport = viewportWidth <= 620;
     const isTabletViewport = viewportWidth <= 900;
     const sampleCardWidth =
-      cardElements[0]?.getBoundingClientRect().width ||
-      clamp(viewportWidth * 0.26, 112, 238);
+      cardElements[0]?.offsetWidth ||
+      clamp(viewportWidth * (isPhoneViewport ? 0.31 : 0.26), 112, 238);
     const availableRadius = Math.max(
-      128,
-      (viewportWidth - sampleCardWidth * (isCompactViewport ? 0.88 : 0.94)) /
+      isPhoneViewport ? 112 : 128,
+      (viewportWidth -
+        sampleCardWidth * (isPhoneViewport ? 0.74 : isCompactViewport ? 0.88 : 0.94)) /
         2,
     );
-    const preferredRadius = viewportWidth *
-      (isCompactViewport ? 0.34 : isTabletViewport ? 0.36 : 0.38);
-    const radius = clamp(preferredRadius, 128, availableRadius);
-    const depth = clamp(radius * (isCompactViewport ? 0.78 : 0.9), 132, 310);
+    const preferredRadius =
+      viewportWidth *
+      (isPhoneViewport ? 0.36 : isCompactViewport ? 0.34 : isTabletViewport ? 0.36 : 0.38);
+    const radius = clamp(
+      preferredRadius,
+      isPhoneViewport ? 112 : 128,
+      availableRadius,
+    );
+    const depth = clamp(
+      radius * (isPhoneViewport ? 0.72 : isCompactViewport ? 0.78 : 0.9),
+      isPhoneViewport ? 114 : 132,
+      310,
+    );
 
     let activeCard = experiences[0];
     let smallestDistance = Number.POSITIVE_INFINITY;
@@ -594,15 +624,19 @@ export function renderLibraryHome(
       const z = Math.cos(rad) * depth;
       const depthFactor = clamp((z + depth) / (depth * 2), 0, 1);
       const lateralSpread =
-        1.04 +
-        (1 - depthFactor) * (isCompactViewport ? 0.54 : 0.4) +
+        (isPhoneViewport ? 1.08 : 1.04) +
+        (1 - depthFactor) * (isPhoneViewport ? 0.68 : isCompactViewport ? 0.54 : 0.4) +
         Math.abs(Math.sin(rad)) * 0.08;
       const x = Math.sin(rad) * radius * lateralSpread;
       const y =
-        Math.cos(rad) * (isCompactViewport ? -16 : -20) +
-        (1 - depthFactor) * (isCompactViewport ? 56 : 48);
-      const scale = 0.36 + Math.pow(depthFactor, 0.88) * 0.64;
-      const opacity = 0.04 + Math.pow(depthFactor, isCompactViewport ? 1.9 : 1.65) * 0.96;
+        Math.cos(rad) * (isPhoneViewport ? -8 : isCompactViewport ? -16 : -20) +
+        (1 - depthFactor) * (isPhoneViewport ? 40 : isCompactViewport ? 56 : 48);
+      const scale = isPhoneViewport
+        ? 0.42 + Math.pow(depthFactor, 0.9) * 0.58
+        : 0.36 + Math.pow(depthFactor, 0.88) * 0.64;
+      const opacity = isPhoneViewport
+        ? 0.1 + Math.pow(depthFactor, 1.55) * 0.9
+        : 0.04 + Math.pow(depthFactor, isCompactViewport ? 1.9 : 1.65) * 0.96;
       const tilt = clamp(Math.sin(rad) * -18, -22, 22);
 
       card.style.transform = `
@@ -638,6 +672,71 @@ export function renderLibraryHome(
       "--orbit-bottom-left",
       activeCard.theme.glowBottomLeft,
     );
+  };
+
+  const setPortraitToastVisible = (visible: boolean) => {
+    if (!portraitToast) {
+      return;
+    }
+
+    portraitToast.hidden = !visible;
+    portraitToast.setAttribute("aria-hidden", visible ? "false" : "true");
+    portraitToast.classList.toggle("is-visible", visible);
+  };
+
+  const stopPortraitToastLoop = () => {
+    window.clearInterval(portraitToastInterval);
+    window.clearTimeout(portraitToastHideTimeout);
+    portraitToastInterval = 0;
+    portraitToastHideTimeout = 0;
+    setPortraitToastVisible(false);
+  };
+
+  const shouldShowPortraitToast = () => {
+    const hasCoarsePointer =
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(any-pointer: coarse)").matches;
+
+    return hasCoarsePointer && window.innerHeight > window.innerWidth;
+  };
+
+  const flashPortraitToast = () => {
+    if (!shouldShowPortraitToast()) {
+      stopPortraitToastLoop();
+      return;
+    }
+
+    setPortraitToastVisible(true);
+    window.clearTimeout(portraitToastHideTimeout);
+    portraitToastHideTimeout = window.setTimeout(() => {
+      setPortraitToastVisible(false);
+    }, PORTRAIT_HINT_VISIBLE_MS);
+  };
+
+  const syncPortraitToastLoop = () => {
+    stopPortraitToastLoop();
+
+    if (!shouldShowPortraitToast()) {
+      return;
+    }
+
+    flashPortraitToast();
+    portraitToastInterval = window.setInterval(
+      flashPortraitToast,
+      PORTRAIT_HINT_INTERVAL_MS,
+    );
+  };
+
+  const onResize = () => {
+    if (resizeAnimationFrame) {
+      cancelAnimationFrame(resizeAnimationFrame);
+    }
+
+    resizeAnimationFrame = requestAnimationFrame(() => {
+      resizeAnimationFrame = 0;
+      syncOrbit();
+      syncPortraitToastLoop();
+    });
   };
 
   const getCardTargetHref = (clientX: number, clientY: number): string | null => {
@@ -862,12 +961,18 @@ export function renderLibraryHome(
   viewport.addEventListener("wheel", onWheel, { passive: false });
   viewport.addEventListener("click", onClickCapture, true);
   viewport.addEventListener("keydown", onKeyDown);
+  window.addEventListener("resize", onResize);
 
   syncOrbit();
+  syncPortraitToastLoop();
 
   return () => {
     stopAnimation();
+    stopPortraitToastLoop();
     window.clearTimeout(profileTimeout);
+    if (resizeAnimationFrame) {
+      cancelAnimationFrame(resizeAnimationFrame);
+    }
     profileButton?.removeEventListener("click", onProfileClick);
     filterButton?.removeEventListener("click", onFilterButtonClick);
     filterPanel?.removeEventListener("click", onFilterPanelClick);
@@ -881,6 +986,7 @@ export function renderLibraryHome(
     viewport.removeEventListener("wheel", onWheel);
     viewport.removeEventListener("click", onClickCapture, true);
     viewport.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("resize", onResize);
   };
 }
 

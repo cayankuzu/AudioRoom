@@ -15,6 +15,17 @@ export interface LibraryUiCopy {
   profileStatus: string;
   profilePopover: string;
   searchPlaceholder: string;
+  mobileHints: {
+    orientationTitle: string;
+    orientationDescription: string;
+  };
+  engagement: {
+    title: string;
+    likes: string;
+    comments: string;
+    shares: string;
+    rating: string;
+  };
   filterButton: string;
   filterPanelEyebrow: string;
   filterPanelTitle: string;

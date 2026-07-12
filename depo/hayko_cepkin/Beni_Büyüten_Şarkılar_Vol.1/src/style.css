@@ -847,6 +847,21 @@ body.is-touch #experience {
 
 body.is-touch .hud { display: none !important; }
 
+body.is-touch .mobile-controls__actions {
+  right: max(0.7rem, env(safe-area-inset-right));
+  bottom: max(0.7rem, env(safe-area-inset-bottom));
+  grid-template-columns: repeat(3, 68px);
+  grid-template-rows: repeat(2, 68px);
+  gap: 8px;
+}
+
+body.is-touch .mobile-controls__action[data-slot="top-left"] { grid-column: 1; grid-row: 1; }
+body.is-touch .mobile-controls__action[data-slot="top-middle"] { grid-column: 2; grid-row: 1; }
+body.is-touch .mobile-controls__action[data-slot="top-right"] { grid-column: 3; grid-row: 1; }
+body.is-touch .mobile-controls__action[data-slot="bottom-left"] { grid-column: 1; grid-row: 2; }
+body.is-touch .mobile-controls__action[data-slot="bottom-middle"] { grid-column: 2; grid-row: 2; }
+body.is-touch .mobile-controls__action[data-slot="bottom-right"] { grid-column: 3; grid-row: 2; }
+
 body.is-touch .minimap {
   left: max(0.35rem, env(safe-area-inset-left));
   top: var(--bbs-chrome-top);
@@ -942,9 +957,9 @@ body.is-touch .start-overlay__cta {
     gap: 5px;
   }
 
-  body.is-touch .mobile-controls__actions--simple {
-    grid-template-columns: 70px;
-    grid-template-rows: 70px;
+  body.is-touch .mobile-controls__actions {
+    grid-template-columns: repeat(3, 64px);
+    grid-template-rows: repeat(2, 64px);
     right: max(0.5rem, env(safe-area-inset-right));
     bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
@@ -973,9 +988,9 @@ body.is-touch .start-overlay__cta {
     gap: 5px;
   }
 
-  body.is-touch .mobile-controls__actions--simple {
-    grid-template-columns: 60px;
-    grid-template-rows: 60px;
+  body.is-touch .mobile-controls__actions {
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 58px);
     right: max(0.45rem, env(safe-area-inset-right));
     bottom: max(0.45rem, env(safe-area-inset-bottom));
   }

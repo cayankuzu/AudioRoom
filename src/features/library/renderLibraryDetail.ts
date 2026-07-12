@@ -4,6 +4,7 @@ import {
   getAvailabilityLabel,
   getReleaseTypeLabel,
 } from "./catalog";
+import { renderLibraryEngagementBar } from "./renderLibraryEngagementBar";
 import { renderLibraryFooter } from "./renderLibraryFooter";
 import { createHomeHref } from "./router";
 
@@ -127,13 +128,16 @@ export function renderLibraryDetail(
 
       <section class="detail-stage">
         <div class="detail-stage__art">
-          <div class="detail-stage__card">
-            <img
-              src="${escapeAttribute(experience.cover)}"
-              alt="${escapeAttribute(`${experience.artist} - ${experience.album}`)}"
-              loading="eager"
-              decoding="async"
-            />
+          <div class="detail-stage__art-stack">
+            <div class="detail-stage__card">
+              <img
+                src="${escapeAttribute(experience.cover)}"
+                alt="${escapeAttribute(`${experience.artist} - ${experience.album}`)}"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
+            ${renderLibraryEngagementBar("detail")}
           </div>
           <div class="detail-stage__orbit detail-stage__orbit--outer" aria-hidden="true"></div>
           <div class="detail-stage__orbit detail-stage__orbit--inner" aria-hidden="true"></div>

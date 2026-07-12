@@ -10,6 +10,18 @@ export const trLibraryLocale: LibraryLocaleBundle = {
     profileStatus: "yakında",
     profilePopover: "Profil alanı çok yakında açılacak.",
     searchPlaceholder: "Şarkı, albüm veya sanatçı ara",
+    mobileHints: {
+      orientationTitle: "Daha iyi bir deneyim için telefonu yan çevirin.",
+      orientationDescription:
+        "Mümkünse klavye ve mouse bağlanabilen cihazlarda veya geniş ekranlarda kullanın.",
+    },
+    engagement: {
+      title: "Topluluk",
+      likes: "Beğeni",
+      comments: "Yorum",
+      shares: "Paylaşım",
+      rating: "Yıldız",
+    },
     filterButton: "Filtrele",
     filterPanelEyebrow: "Seçim alanı",
     filterPanelTitle: "Sanatçı, albüm, format ve durum",

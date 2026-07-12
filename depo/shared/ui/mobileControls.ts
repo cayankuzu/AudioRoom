@@ -136,10 +136,19 @@ export function createMobileControls(
     input.setVirtualKey(keyCode, false);
   };
 
+  const activeControlPointers = new Set<number>();
+  const trackControlPointer = (pointerId: number) => {
+    activeControlPointers.add(pointerId);
+  };
+  const releaseControlPointer = (pointerId: number) => {
+    activeControlPointers.delete(pointerId);
+  };
+
   bindings.forEach(({ button, keyCode }) => {
     const onPointerDown = (event: PointerEvent) => {
       event.preventDefault();
       event.stopPropagation();
+      trackControlPointer(event.pointerId);
       try {
         button.setPointerCapture(event.pointerId);
       } catch {
@@ -152,6 +161,7 @@ export function createMobileControls(
     const onPointerEnd = (event: PointerEvent) => {
       event.preventDefault();
       event.stopPropagation();
+      releaseControlPointer(event.pointerId);
       button.classList.remove("is-pressed");
       release(keyCode);
     };
@@ -195,10 +205,17 @@ export function createMobileControls(
 
     button.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
+      trackControlPointer(event.pointerId);
       button.classList.add("is-pressed");
     });
-    button.addEventListener("pointerup", clear);
-    button.addEventListener("pointercancel", clear);
+    button.addEventListener("pointerup", (event) => {
+      releaseControlPointer(event.pointerId);
+      clear();
+    });
+    button.addEventListener("pointercancel", (event) => {
+      releaseControlPointer(event.pointerId);
+      clear();
+    });
     button.addEventListener("pointerleave", clear);
   });
 
@@ -206,8 +223,6 @@ export function createMobileControls(
     ".mobile-controls__pad",
     ".mobile-controls__action",
     ".mobile-controls__tool",
-    ".mobile-controls__dpad",
-    ".mobile-controls__actions",
     ".mobile-controls__toolbar",
     ".album-panel",
     ".minimap",
@@ -229,6 +244,10 @@ export function createMobileControls(
 
   const onDocumentPointerDown = (event: PointerEvent) => {
     if (event.pointerType === "mouse") {
+      return;
+    }
+
+    if (activeControlPointers.has(event.pointerId)) {
       return;
     }
 
@@ -260,6 +279,8 @@ export function createMobileControls(
   };
 
   const onDocumentPointerEnd = (event: PointerEvent) => {
+    releaseControlPointer(event.pointerId);
+
     if (event.pointerId !== activeLookPointer) {
       return;
     }
