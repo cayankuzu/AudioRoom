@@ -13,8 +13,8 @@ export function createPcHintBanner(
   parent: HTMLElement,
   opts: PcHintBannerOptions = {},
 ): PcHintBanner {
-  const visibleMs = opts.visibleMs ?? 3000;
-  const intervalMs = opts.intervalMs ?? 6000;
+  const visibleMs = opts.visibleMs ?? 5000;
+  const intervalMs = opts.intervalMs ?? 3000;
 
   const el = document.createElement("div");
   el.className = "pc-hint-banner";

@@ -14,8 +14,8 @@ export function createRotateHint(
   parent: HTMLElement,
   opts: RotateHintOptions = {},
 ): RotateHint {
-  const visibleMs = opts.visibleMs ?? 3000;
-  const intervalMs = opts.intervalMs ?? 6000;
+  const visibleMs = opts.visibleMs ?? 5000;
+  const intervalMs = opts.intervalMs ?? 3000;
   const initialDelayMs = opts.initialDelayMs ?? 2500;
 
   const isTouch =
