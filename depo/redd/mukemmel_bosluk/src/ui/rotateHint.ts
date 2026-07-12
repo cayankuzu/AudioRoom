@@ -1,47 +1,23 @@
 export interface RotateHint {
-  /** Periyodik görünürlüğü başlat (her `intervalMs` bir fade-in/out). */
   start(): void;
-  /** Timer'ı durdur ve banner'ı anında gizle. */
   stop(): void;
-  /** Event dinleyicilerini sök ve DOM'dan kaldır. */
   dispose(): void;
 }
 
 export interface RotateHintOptions {
-  /** Göründüğünde ekranda kaç ms kalsın? (fade'lar hariç) */
   visibleMs?: number;
-  /** Gösterimler arası aralık (görünür süre dahil). */
   intervalMs?: number;
-  /** İlk gösterim için gecikme. */
   initialDelayMs?: number;
 }
 
-/**
- * Mobil/tablet kullanıcılarına "daha iyi deneyim için cihazı yan çevirin"
- * uyarısını veren, üst-orta safe-area farkındalı pulse banner.
- *
- * Davranış:
- *  - Yalnızca dokunmatik cihazlarda çalışır (matchMedia).
- *  - `orientation: portrait` iken periyodik olarak (her `intervalMs`) görünür
- *    olur, `visibleMs` sonra kaybolur. Yatay moda geçilirse anında gizlenir
- *    ve periyodik gösterim tekrar tetiklenmez.
- *  - Kütüphane + deneyim sahnelerinin ikisinde de çalışabilir; pc-hint-banner
- *    ile ÇAKIŞMAMASI için çağıran taraf `initialDelayMs` ile faz farkı
- *    verebilir (örn. pc-hint 0s, rotate 2.5s).
- *  - pointer-events: none → canvas girdi akışını hiç etkilemez.
- */
 export function createRotateHint(
   parent: HTMLElement,
   opts: RotateHintOptions = {},
 ): RotateHint {
-  const visibleMs = opts.visibleMs ?? 2400;
-  const intervalMs = opts.intervalMs ?? 5000;
+  const visibleMs = opts.visibleMs ?? 3000;
+  const intervalMs = opts.intervalMs ?? 6000;
   const initialDelayMs = opts.initialDelayMs ?? 2500;
 
-  /**
-   * Dokunmatik olmayan cihazlarda (bilgisayar) hiç mount edilmez — gereksiz
-   * DOM yaratmıyoruz. Bu sayede PC kullanıcıları etkilenmez.
-   */
   const isTouch =
     typeof window !== "undefined" &&
     ((typeof window.matchMedia === "function" &&
@@ -70,8 +46,9 @@ export function createRotateHint(
   let initialTimeoutId: number | null = null;
 
   function isPortrait(): boolean {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return false;
+    }
     return window.matchMedia("(orientation: portrait)").matches;
   }
 
@@ -88,7 +65,6 @@ export function createRotateHint(
   }
 
   function show(): void {
-    /** Yatayda hiç gösterme — kullanıcı zaten doğru konumda. */
     if (!isPortrait()) {
       hideNow();
       return;
@@ -101,10 +77,6 @@ export function createRotateHint(
     }, visibleMs);
   }
 
-  /**
-   * Orientation değişiminde anında tepki ver — yatay moda dönülürse
-   * banner görünür durumda kalmasın.
-   */
   const onOrientationChange = (): void => {
     if (!isPortrait()) hideNow();
   };
@@ -113,10 +85,13 @@ export function createRotateHint(
   return {
     start() {
       if (!isTouch) return;
-      if (intervalId !== null) return;
-      initialTimeoutId = window.setTimeout(show, initialDelayMs);
-      intervalId = window.setInterval(show, intervalMs);
-      /** Orientation değişimlerini dinle — yatay olunca anında gizle. */
+      if (intervalId !== null || initialTimeoutId !== null) return;
+      initialTimeoutId = window.setTimeout(() => {
+        initialTimeoutId = null;
+        show();
+        intervalId = window.setInterval(show, intervalMs);
+      }, initialDelayMs);
+
       if (typeof window.matchMedia === "function") {
         mql = window.matchMedia("(orientation: portrait)");
         if (typeof mql.addEventListener === "function") {

@@ -23,10 +23,10 @@ export function createMobileControls(
     actions: [
       {
         slot: "top-left",
-        keyCode: "Space",
-        glyph: "^",
-        label: "Zipla",
-        ariaLabel: "Zipla",
+        keyCode: "KeyQ",
+        glyph: "Q",
+        label: "Birak",
+        ariaLabel: "Birak",
       },
       {
         slot: "top-middle",
@@ -40,7 +40,7 @@ export function createMobileControls(
         slot: "top-right",
         keyCode: "KeyR",
         glyph: "R",
-        label: "Play",
+        label: "Oynat",
         ariaLabel: "Cal veya durdur",
         tone: "secondary",
       },
@@ -52,11 +52,11 @@ export function createMobileControls(
         ariaLabel: "Kos",
       },
       {
-        slot: "bottom-middle",
-        keyCode: "KeyQ",
-        glyph: "Q",
-        label: "Birak",
-        ariaLabel: "Birak",
+        slot: "bottom-right",
+        keyCode: "Space",
+        glyph: "^",
+        label: "Zipla",
+        ariaLabel: "Zipla",
       },
     ],
     tools: [

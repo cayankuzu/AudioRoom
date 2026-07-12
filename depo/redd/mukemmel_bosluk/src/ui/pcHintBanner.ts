@@ -1,31 +1,20 @@
 export interface PcHintBanner {
-  /** Periyodik görünürlüğü başlat (her 10 sn'de bir fade-in/out). */
   start(): void;
-  /** Timer'ı durdur ve banner'ı anında gizle. */
   stop(): void;
-  /** Root'u DOM'dan kaldır ve tüm timer'ları temizle. */
   dispose(): void;
 }
 
 export interface PcHintBannerOptions {
-  /** Göründüğünde ekranda kaç ms kalsın? (fade'lar hariç) */
   visibleMs?: number;
-  /** Gösterimler arası aralık (görünür süre dahil). */
   intervalMs?: number;
 }
 
-/**
- * Mobilde "Daha iyi deneyim için bilgisayardan girin" pulse banner.
- * Üst orta, safe-area farkında; her `intervalMs` bir görünür olur, kısa
- * süre sonra tekrar kaybolur. Canvas + input akışını etkilemez
- * (pointer-events: none).
- */
 export function createPcHintBanner(
   parent: HTMLElement,
   opts: PcHintBannerOptions = {},
 ): PcHintBanner {
-  const visibleMs = opts.visibleMs ?? 2400;
-  const intervalMs = opts.intervalMs ?? 5000;
+  const visibleMs = opts.visibleMs ?? 3000;
+  const intervalMs = opts.intervalMs ?? 6000;
 
   const el = document.createElement("div");
   el.className = "pc-hint-banner";
@@ -44,6 +33,7 @@ export function createPcHintBanner(
 
   let intervalId: number | null = null;
   let hideTimeoutId: number | null = null;
+  let initialTimeoutId: number | null = null;
 
   function clearHideTimeout(): void {
     if (hideTimeoutId !== null) {
@@ -63,21 +53,28 @@ export function createPcHintBanner(
 
   return {
     start() {
-      if (intervalId !== null) return;
-      /** İlk gösterim biraz gecikmeli — oyun başlar başlamaz rahatsız etmesin. */
-      window.setTimeout(show, 1200);
-      intervalId = window.setInterval(show, intervalMs);
+      if (intervalId !== null || initialTimeoutId !== null) return;
+      initialTimeoutId = window.setTimeout(() => {
+        initialTimeoutId = null;
+        show();
+        intervalId = window.setInterval(show, intervalMs);
+      }, 1200);
     },
     stop() {
       if (intervalId !== null) {
         window.clearInterval(intervalId);
         intervalId = null;
       }
+      if (initialTimeoutId !== null) {
+        window.clearTimeout(initialTimeoutId);
+        initialTimeoutId = null;
+      }
       clearHideTimeout();
       el.classList.remove("is-visible");
     },
     dispose() {
       if (intervalId !== null) window.clearInterval(intervalId);
+      if (initialTimeoutId !== null) window.clearTimeout(initialTimeoutId);
       clearHideTimeout();
       el.remove();
     },

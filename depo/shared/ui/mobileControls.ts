@@ -54,6 +54,7 @@ export function createMobileControls(
   const root = document.createElement("div");
   root.className = "mobile-controls";
   root.setAttribute("aria-hidden", "false");
+  root.dataset.actionCount = String(options.actions.length);
 
   const actionsHtml = options.actions
     .map(
