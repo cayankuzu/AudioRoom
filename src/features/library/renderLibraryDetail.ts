@@ -9,6 +9,8 @@ import { renderLibraryFooter } from "./renderLibraryFooter";
 import { createHomeHref } from "./router";
 
 const libraryLocale = getLibraryLocale();
+const DETAIL_PORTRAIT_HINT_INTERVAL_MS = 6000;
+const DETAIL_PORTRAIT_HINT_VISIBLE_MS = 3000;
 
 export function renderLibraryDetail(
   root: HTMLElement,
@@ -128,6 +130,16 @@ export function renderLibraryDetail(
 
       <section class="detail-stage">
         <div class="detail-stage__art">
+          <aside
+            class="orbit-mobile-toast"
+            data-portrait-toast
+            aria-live="polite"
+            aria-hidden="true"
+            hidden
+          >
+            <strong>${escapeHtml(ui.mobileHints.orientationTitle)}</strong>
+            <span>${escapeHtml(ui.mobileHints.orientationDescription)}</span>
+          </aside>
           <div class="detail-stage__art-stack">
             <div class="detail-stage__card">
               <img
@@ -187,7 +199,78 @@ export function renderLibraryDetail(
   `;
 
   root.appendChild(shell);
-  return () => undefined;
+
+  const portraitToast =
+    shell.querySelector<HTMLElement>("[data-portrait-toast]");
+  let portraitToastInterval = 0;
+  let portraitToastHideTimeout = 0;
+
+  const setPortraitToastVisible = (visible: boolean) => {
+    if (!portraitToast) {
+      return;
+    }
+
+    portraitToast.hidden = !visible;
+    portraitToast.setAttribute("aria-hidden", visible ? "false" : "true");
+    portraitToast.classList.toggle("is-visible", visible);
+  };
+
+  const stopPortraitToastLoop = () => {
+    window.clearInterval(portraitToastInterval);
+    window.clearTimeout(portraitToastHideTimeout);
+    portraitToastInterval = 0;
+    portraitToastHideTimeout = 0;
+    setPortraitToastVisible(false);
+  };
+
+  const shouldShowPortraitToast = () => {
+    const hasCoarsePointer =
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(any-pointer: coarse)").matches;
+
+    return hasCoarsePointer && window.innerHeight > window.innerWidth;
+  };
+
+  const flashPortraitToast = () => {
+    if (!shouldShowPortraitToast()) {
+      stopPortraitToastLoop();
+      return;
+    }
+
+    setPortraitToastVisible(true);
+    window.clearTimeout(portraitToastHideTimeout);
+    portraitToastHideTimeout = window.setTimeout(() => {
+      setPortraitToastVisible(false);
+    }, DETAIL_PORTRAIT_HINT_VISIBLE_MS);
+  };
+
+  const syncPortraitToastLoop = () => {
+    stopPortraitToastLoop();
+
+    if (!shouldShowPortraitToast()) {
+      return;
+    }
+
+    flashPortraitToast();
+    portraitToastInterval = window.setInterval(
+      flashPortraitToast,
+      DETAIL_PORTRAIT_HINT_INTERVAL_MS,
+    );
+  };
+
+  const onResize = () => {
+    syncPortraitToastLoop();
+  };
+
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
+  syncPortraitToastLoop();
+
+  return () => {
+    stopPortraitToastLoop();
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("orientationchange", onResize);
+  };
 }
 
 function escapeHtml(value: string): string {

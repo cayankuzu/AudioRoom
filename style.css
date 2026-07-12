@@ -3448,13 +3448,25 @@ a {
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--orbit-accent) 16%, transparent),
-      color-mix(in srgb, var(--orbit-foil) 12%, transparent)
+      color-mix(
+        in srgb,
+        var(--orbit-accent, var(--detail-accent)) 16%,
+        transparent
+      ),
+      color-mix(
+        in srgb,
+        var(--orbit-foil, var(--detail-foil)) 12%,
+        transparent
+      )
     ),
     rgba(5, 8, 14, 0.88);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
-  transform: translate(-50%, 0);
+  opacity: 0;
+  transform: translate(-50%, -0.4rem);
   pointer-events: none;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
 }
 
 .orbit-mobile-toast strong,
@@ -3482,25 +3494,8 @@ a {
 }
 
 .orbit-mobile-toast.is-visible {
-  animation: orbit-mobile-toast-pop 1s ease;
-}
-
-@keyframes orbit-mobile-toast-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -0.4rem);
-  }
-
-  20%,
-  80% {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -0.25rem);
-  }
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .orbit-album-card__body {

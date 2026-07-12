@@ -47,8 +47,8 @@ const DRAG_ROTATION_FACTOR = 0.22;
 const WHEEL_ROTATION_FACTOR = 0.08;
 const DRAG_THRESHOLD = 8;
 const PROFILE_POPOVER_TIMEOUT_MS = 2200;
-const PORTRAIT_HINT_INTERVAL_MS = 3000;
-const PORTRAIT_HINT_VISIBLE_MS = 5000;
+const PORTRAIT_HINT_INTERVAL_MS = 6000;
+const PORTRAIT_HINT_VISIBLE_MS = 3000;
 const RELEASE_TYPES: readonly LibraryReleaseType[] = ["album", "single", "ep"];
 const AVAILABILITY_OPTIONS: readonly LibraryAvailability[] = [
   "available",
