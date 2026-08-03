@@ -13,9 +13,10 @@ export interface GramophoneHandle {
   readonly hasRecord: boolean;
   canInteract(playerPosition: THREE.Vector3): boolean;
   steal(): boolean;
-  recoverNear(position: THREE.Vector3): void;
+  stashAt(position: THREE.Vector3): boolean;
+  recoverNear(position: THREE.Vector3, preserveUndergroundHeight?: boolean): void;
   playerPickUp(): boolean;
-  playerDrop(): boolean;
+  playerDrop(position?: THREE.Vector3): boolean;
   insertRecord(): boolean;
   removeRecord(): boolean;
   reset(avoidPositions?: readonly AvoidPosition[]): void;
@@ -97,7 +98,6 @@ export function createGramophone(
     canInteract(playerPosition) {
       if (carrier !== "ground") return false;
       base.root.getWorldPosition(worldPosition);
-      worldPosition.y = playerPosition.y;
       return worldPosition.distanceToSquared(playerPosition) <= GRAMOPHONE.interactRadius ** 2;
     },
     steal() {
@@ -105,11 +105,29 @@ export function createGramophone(
       carrier = "rabbit";
       return true;
     },
-    recoverNear(position) {
+    stashAt(position) {
+      if (carrier !== "rabbit") return false;
+      carrier = "ground";
+      base.root.removeFromParent();
+      scene.add(base.root);
+      base.root.position.copy(position);
+      base.root.rotation.set(0, Math.random() * Math.PI * 2, 0);
+      base.root.updateMatrixWorld(true);
+      return true;
+    },
+    recoverNear(position, preserveUndergroundHeight = false) {
       if (carrier !== "rabbit") return;
       carrier = "ground";
       const angle = Math.atan2(position.x, position.z) + Math.PI / 2;
-      placeAt(position.x + Math.sin(angle) * 1.35, position.z + Math.cos(angle) * 1.35);
+      const x = position.x + Math.sin(angle) * 1.35;
+      const z = position.z + Math.cos(angle) * 1.35;
+      if (preserveUndergroundHeight) {
+        base.root.position.set(x, position.y - 1.055, z);
+        base.root.rotation.set(0, Math.random() * Math.PI * 2, 0);
+        base.root.updateMatrixWorld(true);
+      } else {
+        placeAt(x, z);
+      }
     },
     playerPickUp() {
       if (carrier !== "ground") return false;
@@ -117,10 +135,15 @@ export function createGramophone(
       carrier = "player";
       return true;
     },
-    playerDrop() {
+    playerDrop(position) {
       if (carrier !== "player") return false;
       base.toggleCarry(camera, getHeightAt);
       carrier = "ground";
+      if (position) {
+        base.root.position.copy(position);
+        base.root.rotation.set(0, Math.random() * Math.PI * 2, 0);
+        base.root.updateMatrixWorld(true);
+      }
       return true;
     },
     insertRecord() {

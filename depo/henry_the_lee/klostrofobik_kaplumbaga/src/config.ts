@@ -27,7 +27,7 @@ export const BUNNY = {
   collectRadius: 3,
   routeRadius: 27,
   stopDuration: 3,
-  hitWindow: 6,
+  hitWindow: 3,
   gramophoneReach: 1.65,
   recordReach: 1.45,
   guardRadius: 9,

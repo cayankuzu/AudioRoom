@@ -76,11 +76,15 @@ export function bootstrapApp(root: HTMLElement): void {
         if (qaMode === "carrot") {
           window.__klostrofobikDebug?.fire();
         }
+        if (qaMode === "burrow") {
+          window.__klostrofobikDebug?.triggerBurrow();
+        }
         if (
           qaMode === "target" ||
           qaMode === "walking" ||
           qaMode === "stopped" ||
-          qaMode === "stolen"
+          qaMode === "stolen" ||
+          qaMode === "burrow"
         ) {
           window.__klostrofobikDebug?.focusBunny();
         }

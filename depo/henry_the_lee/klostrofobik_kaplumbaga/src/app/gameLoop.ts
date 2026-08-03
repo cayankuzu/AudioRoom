@@ -16,6 +16,7 @@ import {
 } from "../utils/fullscreen";
 import { createArena } from "../world/arena";
 import { createBunny, type BunnyStage } from "../world/bunny";
+import { createBurrowSystem } from "../world/burrows";
 import { createCarrotBlaster } from "../world/carrotBlaster";
 import { createCenterPiece } from "../world/centerPiece";
 import { createCollisionWorld } from "../world/collisionWorld";
@@ -39,9 +40,11 @@ interface DebugSnapshot {
   ready: boolean;
   stage: string;
   objective: string;
+  burrowPhase: string;
   hits: number;
   hitWindowRemaining: number;
   player: [number, number, number];
+  playerYaw: number;
   bunny: [number, number, number];
   gramophone: [number, number, number];
   playerRecord: [number, number, number];
@@ -56,6 +59,7 @@ interface DebugSnapshot {
   recordCaptured: boolean;
   recordInserted: boolean;
   playerRecordState: string;
+  burrows: ReturnType<ReturnType<typeof createBurrowSystem>["snapshot"]>;
   errors: string[];
 }
 
@@ -69,6 +73,9 @@ declare global {
       stealGramophone(): boolean;
       reset(): void;
       fire(): boolean;
+      triggerBurrow(): void;
+      enterTunnel(): boolean;
+      approachBunnyInTunnel(): boolean;
       focusBunny(): void;
       setPlayer(x: number, z: number, yaw?: number): void;
     };
@@ -138,6 +145,7 @@ export function startExperience(
   manager.onError = (url) => console.warn("[Klostrofobik] Varlık yüklenemedi:", url);
 
   const arena = createArena(scene, manager);
+  const burrows = createBurrowSystem(scene, arena.getHeightAt);
   const centerPiece = createCenterPiece(scene, manager, camera, (value) => {
     reportProgress(7 + value * 70, "Kaplumbağa merkezde uyanıyor…");
   });
@@ -160,6 +168,7 @@ export function startExperience(
     manager,
     arena.getHeightAt,
     collisionWorld,
+    burrows,
   );
   const flashlight = createFlashlight(camera);
   const input = createInput(renderer.domElement);
@@ -184,8 +193,14 @@ export function startExperience(
       soundtrack.lock("Plak yerde");
       recordInserted = false;
       const gramPosition = gramophone.position;
+      const underground = burrows.isUndergroundPosition(gramPosition);
       playerRecord.dropAt(
-        dropPosition.set(gramPosition.x + 0.9, gramPosition.y, gramPosition.z + 0.75),
+        dropPosition.set(
+          gramPosition.x + 0.9,
+          underground ? gramPosition.y + 0.08 : gramPosition.y,
+          gramPosition.z + 0.75,
+        ),
+        underground,
       );
       gameHud.flash("Plak gramofondan çıkarıldı", "hit");
     },
@@ -207,7 +222,7 @@ export function startExperience(
       [
         { key: "WASD / Oklar", label: "Yürü" },
         { key: "Shift", label: "Koş · 3 sn sınır" },
-        { key: "C / Ctrl", label: "Çömel" },
+        { key: "C / Ctrl", label: "Çömel · tünele gir" },
         { key: "Boşluk", label: "Zıpla" },
         { key: "Fare", label: "Bakış" },
         { key: "F", label: "Fener" },
@@ -331,7 +346,7 @@ export function startExperience(
   let yaw = 0;
   let pitch = -0.04;
   let verticalVelocity = 0;
-  let currentEyeHeight = PLAYER.eyeHeight;
+  let currentEyeHeight: number = PLAYER.eyeHeight;
   let grounded = true;
   let jumpQueued = false;
   let sprintEnergy: number = PLAYER.sprintDuration;
@@ -355,7 +370,8 @@ export function startExperience(
   window.addEventListener("unhandledrejection", onUnhandledRejection);
 
   const nearStoppedBunny = () =>
-    bunny.stage === "stopped" && horizontalDistance(playerPosition, bunny.position) <= BUNNY.collectRadius;
+    bunny.stage === "stopped" &&
+    bunny.position.distanceTo(playerPosition) <= BUNNY.collectRadius;
 
   const handleBunnyHit = () => {
     const nextStage = bunny.hit();
@@ -389,7 +405,7 @@ export function startExperience(
     }
 
     if (nearStoppedBunny() && gramophone.isStolen) {
-      gramophone.recoverNear(playerPosition);
+      gramophone.recoverNear(playerPosition, burrows.isPlayerInside);
       gameHud.flash("Gramofon tavşandan geri alındı", "success");
       return true;
     }
@@ -429,12 +445,19 @@ export function startExperience(
 
   const dropCarried = (): boolean => {
     if (playerRecord.isCarried) {
-      playerRecord.dropAt(computeDropPosition());
+      const position = computeDropPosition();
+      const tunnelFloor = burrows.getActiveFloorHeight();
+      if (tunnelFloor !== null) position.y = tunnelFloor + 0.08;
+      playerRecord.dropAt(position, tunnelFloor !== null);
       soundtrack.lock("Plak yerde");
       gameHud.flash("Plak yere bırakıldı");
       return true;
     }
-    if (gramophone.playerDrop()) {
+    const tunnelFloor = burrows.getActiveFloorHeight();
+    const gramophoneDrop = tunnelFloor === null
+      ? undefined
+      : computeDropPosition().setY(tunnelFloor + 0.025);
+    if (gramophone.playerDrop(gramophoneDrop)) {
       gameHud.flash("Gramofon yere bırakıldı");
       return true;
     }
@@ -521,6 +544,7 @@ export function startExperience(
 
     arena.update(time, delta);
     centerPiece.update(time, delta);
+    burrows.update(time, delta);
     collisionWorld.update();
 
     if (input.isLocked()) {
@@ -539,8 +563,17 @@ export function startExperience(
       wish.set(0, 0, 0).addScaledVector(forward, forwardAxis).addScaledVector(right, sideAxis);
       if (wish.lengthSq() > 1) wish.normalize();
       const moving = wish.lengthSq() > 0.001;
+      const wantsCrouch =
+        input.pressed.has("KeyC") ||
+        input.pressed.has("ControlLeft") ||
+        input.pressed.has("ControlRight");
+      const insideTunnel = burrows.isPlayerInside;
+      const crouching = wantsCrouch || insideTunnel;
       const wantsSprint =
-        moving && (input.pressed.has("ShiftLeft") || input.pressed.has("ShiftRight"));
+        moving &&
+        !crouching &&
+        !insideTunnel &&
+        (input.pressed.has("ShiftLeft") || input.pressed.has("ShiftRight"));
       sprintingNow = wantsSprint && !sprintExhausted && sprintEnergy > 0;
       if (sprintingNow) {
         sprintEnergy = Math.max(0, sprintEnergy - sprintDelta);
@@ -559,10 +592,6 @@ export function startExperience(
           gameHud.flash("Hızlı koşu yeniden hazır", "success");
         }
       }
-      const crouching =
-        input.pressed.has("KeyC") ||
-        input.pressed.has("ControlLeft") ||
-        input.pressed.has("ControlRight");
       const targetEyeHeight = crouching ? PLAYER.crouchEyeHeight : PLAYER.eyeHeight;
       currentEyeHeight +=
         (targetEyeHeight - currentEyeHeight) * (1 - Math.exp(-12 * delta));
@@ -576,34 +605,59 @@ export function startExperience(
       velocity.z += (wish.z * targetSpeed - velocity.z) * smoothing;
       nextPosition.copy(playerPosition).addScaledVector(velocity, delta);
 
-      const radial = Math.hypot(nextPosition.x, nextPosition.z);
-      const worldLimit = WORLD.radius - 4;
-      if (radial > worldLimit) {
-        nextPosition.x *= worldLimit / radial;
-        nextPosition.z *= worldLimit / radial;
-      }
-      if (jumpQueued && grounded) {
-        verticalVelocity = PLAYER.jumpSpeed;
-        grounded = false;
-      }
-      jumpQueued = false;
-      verticalVelocity -= PLAYER.gravity * delta;
-      nextPosition.y = playerPosition.y + verticalVelocity * delta;
-      const floor = arena.getHeightAt(nextPosition.x, nextPosition.z) + currentEyeHeight;
-      if (nextPosition.y <= floor) {
-        nextPosition.y = floor;
+      if (insideTunnel) {
+        jumpQueued = false;
         verticalVelocity = 0;
         grounded = true;
-      }
-      collisionWorld.resolvePlayer(nextPosition, currentEyeHeight);
-      const resolvedFloor =
-        arena.getHeightAt(nextPosition.x, nextPosition.z) + currentEyeHeight;
-      if (grounded || nextPosition.y <= resolvedFloor) {
-        nextPosition.y = resolvedFloor;
-        verticalVelocity = 0;
-        grounded = true;
+        const tunnelState = burrows.resolvePlayer(
+          nextPosition,
+          currentEyeHeight,
+          forwardAxis,
+        );
+        if (tunnelState === "exited") {
+          velocity.multiplyScalar(0.35);
+          gameHud.flash("Tünelden yeniden yeryüzüne çıktın", "success");
+        }
+      } else {
+        const radial = Math.hypot(nextPosition.x, nextPosition.z);
+        const worldLimit = WORLD.radius - 4;
+        if (radial > worldLimit) {
+          nextPosition.x *= worldLimit / radial;
+          nextPosition.z *= worldLimit / radial;
+        }
+        if (jumpQueued && grounded) {
+          verticalVelocity = PLAYER.jumpSpeed;
+          grounded = false;
+        }
+        jumpQueued = false;
+        verticalVelocity -= PLAYER.gravity * delta;
+        nextPosition.y = playerPosition.y + verticalVelocity * delta;
+        const floor = arena.getHeightAt(nextPosition.x, nextPosition.z) + currentEyeHeight;
+        if (nextPosition.y <= floor) {
+          nextPosition.y = floor;
+          verticalVelocity = 0;
+          grounded = true;
+        }
+        collisionWorld.resolvePlayer(nextPosition, currentEyeHeight);
+        const resolvedFloor =
+          arena.getHeightAt(nextPosition.x, nextPosition.z) + currentEyeHeight;
+        if (grounded || nextPosition.y <= resolvedFloor) {
+          nextPosition.y = resolvedFloor;
+          verticalVelocity = 0;
+          grounded = true;
+        }
       }
       playerPosition.copy(nextPosition);
+      if (
+        !insideTunnel &&
+        burrows.tryEnter(playerPosition, wantsCrouch, PLAYER.crouchEyeHeight)
+      ) {
+        currentEyeHeight = PLAYER.crouchEyeHeight;
+        verticalVelocity = 0;
+        velocity.multiplyScalar(0.42);
+        grounded = true;
+        gameHud.flash("Tünele girdin · çömelerek ilerle", "hit");
+      }
 
       const firing = input.pressed.has("KeyX");
       if (firing && (!fireHeldLastFrame || input.isTouch) && readyState && blaster.fire()) {
@@ -623,6 +677,7 @@ export function startExperience(
       sprintingNow,
       sprintExhausted,
     );
+    gameHud.setTunnel(burrows.isPlayerInside);
     const bob = input.isLocked() && grounded
       ? Math.sin(time * (6.5 + horizontalSpeed * 0.55)) * Math.min(0.035, horizontalSpeed * 0.004)
       : 0;
@@ -631,17 +686,24 @@ export function startExperience(
     camera.rotation.set(pitch, yaw, 0, "YXZ");
 
     const gramophonePosition = gramophone.position;
+    const playerUnderground = burrows.isPlayerInside;
+    const gramophoneUnderground = burrows.isUndergroundPosition(gramophonePosition);
     const gramophoneGuarded =
+      playerUnderground === gramophoneUnderground &&
       horizontalDistance(playerPosition, gramophonePosition) <= BUNNY.guardRadius;
-    const droppedRecordPosition =
+    const visibleDroppedRecordPosition =
       playerRecord.state === "dropped" ? playerRecord.position : null;
+    const droppedRecordPosition =
+      visibleDroppedRecordPosition && !burrows.isUndergroundPosition(visibleDroppedRecordPosition)
+        ? visibleDroppedRecordPosition
+        : null;
     bunny.update(time, bunnyDelta, {
       playerPosition,
       gramophonePosition,
       gramophoneStolen: gramophone.isStolen,
       gramophoneGuarded,
       gramophoneAvailable:
-        gramophone.isPlaced && !bunny.hasRecord,
+        gramophone.isPlaced && !bunny.hasRecord && !gramophoneUnderground,
       droppedRecordPosition,
       onStealGramophone: () => {
         if (
@@ -663,8 +725,22 @@ export function startExperience(
         gameHud.flash("Tavşan yerdeki plağı çaldı!", "hit");
         return true;
       },
+      onOpenBurrow: (start, end) => {
+        const plan = burrows.openTunnel(start, end);
+        gameHud.flash("Tavşan yere bir tünel kazıyor!", "hit");
+        return plan;
+      },
+      onFindExistingBurrow: (position) => {
+        const plan = burrows.findExistingTunnel(position);
+        if (plan) gameHud.flash("Tavşan eski bir deliğe kaçıyor!", "hit");
+        return plan;
+      },
+      onRevealBurrowExit: (tunnelId, position) => {
+        burrows.revealExit(tunnelId, position);
+        gameHud.flash("Tavşan tünelin çıkışını yeryüzüne açtı!", "hit");
+      },
       onHitStreakExpired: () => {
-        gameHud.flash("6 saniye doldu · İsabet zinciri sıfırlandı", "hit");
+        gameHud.flash("3 saniye doldu · İsabet zinciri sıfırlandı", "hit");
       },
     });
     gameHud.setHitStreak(
@@ -684,7 +760,10 @@ export function startExperience(
       time,
       gameDelta,
       bunny.position,
-      bunny.stage === "running" || bunny.stage === "walking",
+      (bunny.stage === "running" ||
+        bunny.stage === "walking" ||
+        bunny.stage === "hiding") &&
+        (bunny.burrowPhase === "surface" || bunny.burrowPhase === "underground"),
       handleBunnyHit,
     );
 
@@ -702,6 +781,10 @@ export function startExperience(
       interactionHint.show("E", "Gramofonu al · Q ile bırak");
     } else if (gramophone.isPlayerCarried) {
       interactionHint.show("Q", "Gramofonu yere bırak");
+    } else if (burrows.isPlayerInside) {
+      interactionHint.show("C / CTRL", "Çömelerek tünelin diğer çıkışına ilerle");
+    } else if (burrows.isNearEntrance(playerPosition)) {
+      interactionHint.show("C / CTRL", "Çömel ve tavşan tüneline gir");
     } else {
       interactionHint.hide();
     }
@@ -713,8 +796,9 @@ export function startExperience(
       bunny.position,
       bunny.hasRecord,
       playerRecord.state === "dropped" ? playerRecord.position : null,
+      burrows.entrances,
     );
-    const musicDistance = horizontalDistance(playerPosition, gramophone.position);
+    const musicDistance = playerPosition.distanceTo(gramophone.position);
     const normalizedMusicDistance = clamp((musicDistance - 2.5) / 48, 0, 1);
     soundtrack.setDistanceGain((1 - normalizedMusicDistance) ** 1.45);
     victoryPulse = Math.max(0, victoryPulse - delta * 0.2);
@@ -730,9 +814,11 @@ export function startExperience(
       ready: readyState,
       stage: bunny.stage,
       objective: bunny.objective,
+      burrowPhase: bunny.burrowPhase,
       hits: bunny.hits,
       hitWindowRemaining: bunny.hitWindowRemaining,
       player: [playerPosition.x, playerPosition.y, playerPosition.z],
+      playerYaw: yaw,
       bunny: [bunny.position.x, bunny.position.y, bunny.position.z],
       bunnyYaw: bunny.group.rotation.y,
       gramophone: [gramophone.position.x, gramophone.position.y, gramophone.position.z],
@@ -752,6 +838,7 @@ export function startExperience(
       recordCaptured,
       recordInserted,
       playerRecordState: playerRecord.state,
+      burrows: burrows.snapshot(),
       errors: [...runtimeErrors],
     }),
     hitBunny: () => {
@@ -769,7 +856,9 @@ export function startExperience(
     },
     insertRecord: () => {
       if (!recordCaptured) window.__klostrofobikDebug?.captureRecord();
-      if (gramophone.isStolen) gramophone.recoverNear(playerPosition);
+      if (gramophone.isStolen) {
+        gramophone.recoverNear(playerPosition, burrows.isPlayerInside);
+      }
       playerPosition.copy(gramophone.position);
       playerPosition.y = arena.getHeightAt(playerPosition.x, playerPosition.z) + PLAYER.eyeHeight;
       return tryInteract();
@@ -780,6 +869,32 @@ export function startExperience(
       const fired = readyState && blaster.fire();
       if (fired) shotsFired += 1;
       return fired;
+    },
+    triggerBurrow: () => bunny.triggerBurrow(),
+    enterTunnel: () => {
+      const entrance = burrows.entrances[0];
+      if (!entrance) return false;
+      currentEyeHeight = PLAYER.crouchEyeHeight;
+      playerPosition.set(
+        entrance.x,
+        entrance.y + PLAYER.crouchEyeHeight,
+        entrance.z,
+      );
+      velocity.set(0, 0, 0);
+      verticalVelocity = 0;
+      grounded = true;
+      return burrows.tryEnter(playerPosition, true, PLAYER.crouchEyeHeight);
+    },
+    approachBunnyInTunnel: () => {
+      currentEyeHeight = PLAYER.crouchEyeHeight;
+      velocity.set(0, 0, 0);
+      verticalVelocity = 0;
+      grounded = true;
+      return burrows.debugPlacePlayerNear(
+        bunny.position,
+        playerPosition,
+        PLAYER.crouchEyeHeight,
+      );
     },
     focusBunny: () => {
       const away = new THREE.Vector3(
@@ -842,6 +957,7 @@ export function startExperience(
       playerRecord.dispose();
       gramophone.dispose();
       bunny.dispose();
+      burrows.dispose();
       centerPiece.dispose();
       arena.dispose();
       input.dispose();

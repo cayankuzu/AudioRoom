@@ -2,6 +2,7 @@ export interface GameHud {
   element: HTMLElement;
   setSprint(value: number, sprinting: boolean, exhausted: boolean): void;
   setHitStreak(hits: number, remaining: number, duration: number): void;
+  setTunnel(inside: boolean): void;
   flash(message: string, tone?: "default" | "hit" | "success"): void;
   dispose(): void;
 }
@@ -25,6 +26,10 @@ export function createGameHud(parent: HTMLElement): GameHud {
       <div class="sprint-meter__head"><span>HIZLI KOŞU</span><em data-sprint-label>3.0 sn</em></div>
       <div class="sprint-meter__track"><i data-sprint-fill></i></div>
     </div>
+    <div class="tunnel-state" data-tunnel aria-live="polite">
+      <span>YERALTI TÜNELİ</span>
+      <strong>ÇÖMELEREK İLERLE</strong>
+    </div>
     <div class="game-toast" data-toast role="status" aria-live="polite">
       <span data-toast-index>01</span>
       <strong data-toast-message>Hazır</strong>
@@ -42,6 +47,7 @@ export function createGameHud(parent: HTMLElement): GameHud {
   const hitCount = element.querySelector<HTMLElement>("[data-hit-count]");
   const hitTime = element.querySelector<HTMLElement>("[data-hit-time]");
   const hitFill = element.querySelector<HTMLElement>("[data-hit-fill]");
+  const tunnel = element.querySelector<HTMLElement>("[data-tunnel]");
   let timer = 0;
   let count = 0;
 
@@ -69,6 +75,9 @@ export function createGameHud(parent: HTMLElement): GameHud {
       if (hitFill) {
         hitFill.style.width = `${Math.max(0, Math.min(1, remaining / duration)) * 100}%`;
       }
+    },
+    setTunnel(inside) {
+      tunnel?.classList.toggle("is-visible", inside);
     },
     flash(nextMessage, tone = "default") {
       count += 1;

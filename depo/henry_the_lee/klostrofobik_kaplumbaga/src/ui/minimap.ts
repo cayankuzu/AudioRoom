@@ -9,6 +9,7 @@ export interface Minimap {
     bunny: THREE.Vector3,
     recordOnBunny: boolean,
     droppedRecord: THREE.Vector3 | null,
+    burrowEntrances: readonly THREE.Vector3[],
   ): void;
   toggle(): void;
   isOpen(): boolean;
@@ -69,7 +70,7 @@ export function createMinimap(parent: HTMLElement): Minimap {
   };
 
   return {
-    update(player, yaw, gramophone, bunny, recordOnBunny, droppedRecord) {
+    update(player, yaw, gramophone, bunny, recordOnBunny, droppedRecord, burrowEntrances) {
       const now = performance.now();
       if (now - lastDraw < 33) return;
       lastDraw = now;
@@ -105,6 +106,14 @@ export function createMinimap(parent: HTMLElement): Minimap {
       if (droppedRecord) {
         const vinyl = point(droppedRecord, player);
         drawMarker(vinyl.x, vinyl.y, "#d13c47", 3.2, true);
+      }
+      for (const entrance of burrowEntrances) {
+        const hole = point(entrance, player);
+        ctx.strokeStyle = "rgba(222, 105, 49, .72)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, 3.6, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       ctx.save();

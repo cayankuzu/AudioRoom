@@ -821,6 +821,51 @@ body.is-ui-hidden .game-ui {
   background: #a54d42;
 }
 
+.game-ui::before {
+  position: fixed;
+  inset: 0;
+  content: "";
+  background:
+    radial-gradient(ellipse at 50% 48%, transparent 25%, rgba(18, 7, 2, 0.2) 62%, rgba(5, 2, 1, 0.76) 100%),
+    linear-gradient(180deg, rgba(112, 48, 19, 0.12), rgba(0, 0, 0, 0.24));
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+body.is-in-tunnel .game-ui::before {
+  opacity: 1;
+}
+
+.tunnel-state {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(0.55rem, env(safe-area-inset-bottom)) + 6.45rem);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.48rem 0.72rem;
+  transform: translate(-50%, 8px);
+  border: 1px solid rgba(221, 116, 57, 0.28);
+  border-radius: 2px;
+  background: rgba(16, 7, 3, 0.78);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+  color: rgba(245, 215, 167, 0.58);
+  font: 600 0.52rem "DM Mono", monospace;
+  letter-spacing: 0.18em;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tunnel-state strong {
+  color: #e89754;
+  font: inherit;
+}
+
+.tunnel-state.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
 .hit-streak {
   position: absolute;
   top: max(1rem, env(safe-area-inset-top));

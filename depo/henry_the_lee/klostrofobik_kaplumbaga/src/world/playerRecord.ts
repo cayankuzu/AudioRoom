@@ -9,7 +9,7 @@ export interface PlayerRecordHandle {
   readonly position: THREE.Vector3;
   readonly isCarried: boolean;
   carry(): void;
-  dropAt(position: THREE.Vector3): void;
+  dropAt(position: THREE.Vector3, preserveHeight?: boolean): void;
   hide(): void;
   canPickUp(playerPosition: THREE.Vector3): boolean;
   update(time: number, speed: number): void;
@@ -123,7 +123,7 @@ export function createPlayerRecord(
       const halo = anchor.getObjectByName("record-halo");
       if (halo) halo.visible = false;
     },
-    dropAt(position) {
+    dropAt(position, preserveHeight = false) {
       reparent(scene);
       state = "dropped";
       anchor.visible = true;
@@ -131,7 +131,7 @@ export function createPlayerRecord(
       anchor.rotation.set(0, 0, 0);
       anchor.position.set(
         position.x,
-        getHeightAt(position.x, position.z) + 0.07,
+        preserveHeight ? position.y : getHeightAt(position.x, position.z) + 0.07,
         position.z,
       );
       const halo = anchor.getObjectByName("record-halo");
@@ -143,10 +143,9 @@ export function createPlayerRecord(
       anchor.visible = false;
     },
     canPickUp(playerPosition) {
-      return (
-        state === "dropped" &&
-        Math.hypot(anchor.position.x - playerPosition.x, anchor.position.z - playerPosition.z) <= 2.8
-      );
+      if (state !== "dropped") return false;
+      anchor.getWorldPosition(worldPosition);
+      return worldPosition.distanceTo(playerPosition) <= 3.15;
     },
     update(time, speed) {
       if (state === "carried") {

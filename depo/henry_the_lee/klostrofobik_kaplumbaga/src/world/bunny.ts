@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ASSETS, BUNNY } from "../config";
+import type { BurrowTravelPlan } from "./burrows";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -9,9 +10,14 @@ export type BunnyStage =
   | "running"
   | "walking"
   | "stopped"
+  | "hiding"
+  | "digging"
+  | "underground"
+  | "emerging"
   | "captured";
 
-export type BunnyObjective = "flee" | "record" | "gramophone" | "idle";
+export type BunnyObjective = "flee" | "record" | "gramophone" | "burrow" | "idle";
+export type BunnyBurrowPhase = "surface" | "digging" | "underground" | "emerging";
 
 export interface BunnyUpdateContext {
   playerPosition: THREE.Vector3;
@@ -22,6 +28,9 @@ export interface BunnyUpdateContext {
   droppedRecordPosition: THREE.Vector3 | null;
   onStealGramophone(): boolean;
   onStealRecord(): boolean;
+  onOpenBurrow(start: THREE.Vector3, end: THREE.Vector3): BurrowTravelPlan;
+  onFindExistingBurrow(position: THREE.Vector3): BurrowTravelPlan | null;
+  onRevealBurrowExit(tunnelId: number, position: THREE.Vector3): void;
   onHitStreakExpired(): void;
 }
 
@@ -32,12 +41,14 @@ export interface BunnyHandle {
   readonly hits: number;
   readonly hitWindowRemaining: number;
   readonly objective: BunnyObjective;
+  readonly burrowPhase: BunnyBurrowPhase;
   readonly position: THREE.Vector3;
   readonly hasRecord: boolean;
   hit(): BunnyStage;
   canCollect(playerPosition: THREE.Vector3): boolean;
   collect(): boolean;
   reset(): void;
+  triggerBurrow(): void;
   update(time: number, delta: number, context: BunnyUpdateContext): void;
   getHitPoint(target?: THREE.Vector3): THREE.Vector3;
   dispose(): void;
@@ -128,6 +139,11 @@ function routePosition(angle: number, target = new THREE.Vector3()): THREE.Vecto
   return target;
 }
 
+function smoothstep(value: number): number {
+  const clamped = THREE.MathUtils.clamp(value, 0, 1);
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 export function createBunny(
   scene: THREE.Scene,
   manager: THREE.LoadingManager,
@@ -169,6 +185,18 @@ export function createBunny(
   let boundaryTurning = false;
   let hasRecord = true;
   let objective: BunnyObjective = "flee";
+  let burrowPhase: BunnyBurrowPhase = "surface";
+  let burrowCooldown = 10 + Math.random() * 8;
+  let burrowTimer = 0;
+  let burrowDuration = 1;
+  let burrowProgress = 0;
+  let burrowDirection: 1 | -1 = 1;
+  let burrowTurnCooldown = 0;
+  let burrowHideProgress = 0.5;
+  let burrowWillHide = false;
+  let burrowHasHidden = false;
+  let burrowPlan: BurrowTravelPlan | null = null;
+  let preBurrowStage: "running" | "walking" = "running";
   let mixer: THREE.AnimationMixer | null = null;
   let runAction: THREE.AnimationAction | null = null;
   let walkAction: THREE.AnimationAction | null = null;
@@ -188,6 +216,11 @@ export function createBunny(
   const handPosition = new THREE.Vector3();
   const recordNormal = new THREE.Vector3();
   const recordSide = new THREE.Vector3();
+  const burrowTarget = new THREE.Vector3();
+  const burrowTravel = new THREE.Vector3();
+  const burrowTravelDirection = new THREE.Vector3();
+  const burrowEmergence = new THREE.Vector3();
+  let burrowEmergenceStartY = 0;
   const recordLight = new THREE.PointLight("#e7783e", 0.75, 7.5, 2);
   scene.add(recordLight);
 
@@ -371,6 +404,110 @@ export function createBunny(
     recordLight.intensity = 0.62 + Math.sin(time * 3.1) * 0.18;
   };
 
+  const updateAnimation = (time: number, delta: number) => {
+    if (mixer) {
+      const nearlyFrozen =
+        stage === "stopped" || stage === "captured" || stage === "hiding";
+      const burrowing = stage === "digging" || stage === "emerging";
+      const targetTimeScale = nearlyFrozen ? 0.035 : burrowing ? 0.68 : 1;
+      mixer.timeScale +=
+        (targetTimeScale - mixer.timeScale) * (1 - Math.exp(-7 * delta));
+      mixer.update(delta);
+    } else if (
+      character &&
+      (stage === "running" ||
+        stage === "walking" ||
+        stage === "hiding" ||
+        stage === "digging" ||
+        stage === "underground" ||
+        stage === "emerging")
+    ) {
+      character.rotation.z = Math.sin(time * (stage === "walking" ? 5 : 12)) * 0.055;
+    }
+
+    hitPulse = Math.max(0, hitPulse - delta * 2.6);
+    const ringMaterial = targetRing.material as THREE.MeshBasicMaterial;
+    ringMaterial.color.set(
+      burrowPhase !== "surface"
+        ? "#d96832"
+        : hitPulse > 0
+          ? "#ff5d32"
+          : stage === "stopped"
+            ? "#d7e782"
+            : "#efbc62",
+    );
+    ringMaterial.opacity = 0.45 + Math.sin(time * 4) * 0.16 + hitPulse * 0.32;
+    targetRing.scale.setScalar(1 + hitPulse * 0.5);
+    updateRecord(time);
+  };
+
+  const startBurrow = (plan: BurrowTravelPlan) => {
+    preBurrowStage = stage === "walking" ? "walking" : "running";
+    burrowPlan = plan;
+    burrowPhase = "digging";
+    stage = "digging";
+    objective = "burrow";
+    speed = 0;
+    burrowDuration = plan.isNew ? 1.35 : 0.78;
+    burrowTimer = burrowDuration;
+    burrowProgress = 0;
+    burrowDirection = 1;
+    burrowTurnCooldown = 0;
+    burrowHideProgress = 0.28 + Math.random() * 0.44;
+    burrowWillHide = Math.random() < 0.42;
+    burrowHasHidden = false;
+    root.position.x = plan.entry.x;
+    root.position.z = plan.entry.z;
+    movementTarget.copy(burrowPlan.exit);
+  };
+
+  const beginBurrow = (context: BunnyUpdateContext) => {
+    if (Math.random() < 0.58) {
+      const existingPlan = context.onFindExistingBurrow(root.position);
+      if (existingPlan) {
+        burrowPlan = existingPlan;
+        objective = "burrow";
+        movementTarget.copy(existingPlan.entry);
+        diversionFor = Math.max(diversionFor, 8);
+        return;
+      }
+    }
+
+    awayFromPlayer.subVectors(root.position, context.playerPosition);
+    awayFromPlayer.y = 0;
+    if (awayFromPlayer.lengthSq() < 0.001) {
+      awayFromPlayer.set(Math.sin(root.rotation.y), 0, Math.cos(root.rotation.y));
+    }
+    awayFromPlayer.normalize();
+    const limit = BUNNY.boundaryRadius - 5;
+    const requestedDistance = 13 + Math.random() * 33;
+    let bestDistance = 0;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const angleSpread = attempt === 0 ? 1.1 : Math.PI * 1.65;
+      burrowTravelDirection
+        .copy(awayFromPlayer)
+        .applyAxisAngle(UP, (Math.random() - 0.5) * angleSpread);
+      burrowTarget
+        .copy(root.position)
+        .addScaledVector(burrowTravelDirection, requestedDistance);
+      const radial = Math.hypot(burrowTarget.x, burrowTarget.z);
+      if (radial > limit) {
+        burrowTarget.x *= limit / radial;
+        burrowTarget.z *= limit / radial;
+      }
+      bestDistance = Math.hypot(
+        burrowTarget.x - root.position.x,
+        burrowTarget.z - root.position.z,
+      );
+      if (bestDistance >= 11) break;
+    }
+    if (bestDistance < 11) {
+      burrowTarget.set(-root.position.x * 0.58, root.position.y, -root.position.z * 0.58);
+    }
+
+    startBurrow(context.onOpenBurrow(root.position, burrowTarget));
+  };
+
   routePosition(routeAngle, root.position);
   routePosition(routeAngle + 0.7, movementTarget);
   moveDirection.subVectors(movementTarget, root.position);
@@ -392,6 +529,9 @@ export function createBunny(
     get objective() {
       return objective;
     },
+    get burrowPhase() {
+      return burrowPhase;
+    },
     get position() {
       return root.position;
     },
@@ -399,14 +539,28 @@ export function createBunny(
       return hasRecord;
     },
     hit() {
-      if (stage === "loading" || stage === "stopped" || stage === "captured") {
+      if (stage !== "running" && stage !== "walking" && stage !== "hiding") {
         return stage;
       }
+      const wasHiding = stage === "hiding";
+      if (wasHiding) {
+        stage = "running";
+        speed = BUNNY.runSpeed;
+        mixer && (mixer.timeScale = 1);
+        runAction?.reset().fadeIn(0.12).play();
+      }
       hits += 1;
+      burrowCooldown = Math.max(burrowCooldown, 7.5);
       hitWindowRemaining = BUNNY.hitWindow;
       hitPulse = 1;
       diversionFor = 2.8;
       pendingHitEvasion = true;
+      if (burrowPhase === "underground" && burrowTurnCooldown <= 0) {
+        burrowDirection = burrowDirection === 1 ? -1 : 1;
+        burrowTurnCooldown = 0.65;
+        root.rotation.y += Math.PI;
+        pendingHitEvasion = false;
+      }
       if (hits === 3) {
         stage = "walking";
         speed = BUNNY.walkSpeed;
@@ -426,10 +580,7 @@ export function createBunny(
     canCollect(playerPosition) {
       return (
         stage === "stopped" && hasRecord &&
-        Math.hypot(
-          root.position.x - playerPosition.x,
-          root.position.z - playerPosition.z,
-        ) <= BUNNY.collectRadius
+        root.position.distanceTo(playerPosition) <= BUNNY.collectRadius
       );
     },
     collect() {
@@ -454,19 +605,37 @@ export function createBunny(
       boundaryTurning = false;
       hasRecord = true;
       objective = "flee";
+      burrowPhase = "surface";
+      burrowCooldown = 10 + Math.random() * 8;
+      burrowTimer = 0;
+      burrowDuration = 1;
+      burrowProgress = 0;
+      burrowDirection = 1;
+      burrowTurnCooldown = 0;
+      burrowHideProgress = 0.5;
+      burrowWillHide = false;
+      burrowHasHidden = false;
+      burrowEmergenceStartY = 0;
+      burrowPlan = null;
+      root.visible = true;
       stage = character ? "running" : "loading";
       mixer && (mixer.timeScale = 1);
       walkAction?.stop();
       runAction?.reset().fadeIn(0.18).play();
       if (record && !record.parent) scene.add(record);
+      if (record) record.visible = true;
       recordLight.intensity = 0.7;
       routePosition(routeAngle, root.position);
       routePosition(routeAngle + 0.7, movementTarget);
       moveDirection.subVectors(movementTarget, root.position);
       root.rotation.y = Math.atan2(moveDirection.x, moveDirection.z);
     },
+    triggerBurrow() {
+      if (burrowPhase === "surface" && !burrowPlan) burrowCooldown = 0;
+    },
     update(time, delta, context) {
       diversionFor = Math.max(0, diversionFor - delta);
+      burrowTurnCooldown = Math.max(0, burrowTurnCooldown - delta);
 
       if (
         hits > 0 &&
@@ -493,25 +662,193 @@ export function createBunny(
         if (stoppedFor <= 0) resumeRunning(context.gramophoneStolen);
       }
 
+      if (
+        burrowPhase === "surface" &&
+        burrowPlan === null &&
+        hits === 0 &&
+        (stage === "running" || stage === "walking")
+      ) {
+        burrowCooldown = Math.max(0, burrowCooldown - delta);
+        if (burrowCooldown <= 0) beginBurrow(context);
+      }
+
+      if (burrowPhase !== "surface" && burrowPlan) {
+        if (burrowPhase === "digging") {
+          burrowTimer = Math.max(0, burrowTimer - delta);
+          const progress = 1 - burrowTimer / Math.max(0.001, burrowDuration);
+          root.position.x = burrowPlan.entry.x;
+          root.position.z = burrowPlan.entry.z;
+          root.position.y =
+            burrowPlan.entry.y - smoothstep(progress) * (BUNNY.height * 1.12);
+          root.rotation.y += delta * (0.8 + Math.sin(time * 9) * 0.16);
+
+          if (burrowTimer <= 0) {
+            burrowPhase = "underground";
+            stage = hits >= 3 ? "walking" : "running";
+            speed = stage === "walking" ? BUNNY.walkSpeed : BUNNY.runSpeed;
+            burrowProgress = 0.035;
+            burrowDirection = 1;
+          }
+        } else if (burrowPhase === "underground") {
+          const playerIsUnderground = context.playerPosition.y < -2.25;
+          const playerDistance = root.position.distanceTo(context.playerPosition);
+          const seesPlayer = playerIsUnderground && playerDistance <= 13.5;
+          if (seesPlayer && burrowTurnCooldown <= 0) {
+            const entryDistance = burrowPlan.entry.distanceToSquared(
+              context.playerPosition,
+            );
+            const exitDistance = burrowPlan.exit.distanceToSquared(
+              context.playerPosition,
+            );
+            const escapeDirection: 1 | -1 = exitDistance >= entryDistance ? 1 : -1;
+            if (escapeDirection !== burrowDirection) root.rotation.y += Math.PI;
+            burrowDirection = escapeDirection;
+            burrowTurnCooldown = 1.35;
+            if (stage === "hiding") {
+              stage = hits >= 3 ? "walking" : "running";
+              speed = stage === "walking" ? BUNNY.walkSpeed : BUNNY.runSpeed;
+              mixer && (mixer.timeScale = 1);
+              runAction?.reset().fadeIn(0.14).play();
+            }
+          }
+
+          if (stage !== "stopped" && stage !== "hiding") {
+            const undergroundSpeed =
+              stage === "walking" ? BUNNY.walkSpeed : BUNNY.runSpeed;
+            burrowProgress = THREE.MathUtils.clamp(
+              burrowProgress +
+                (delta * undergroundSpeed * burrowDirection) / burrowPlan.length,
+              0,
+              1,
+            );
+          }
+          if (
+            burrowWillHide &&
+            !burrowHasHidden &&
+            !seesPlayer &&
+            (stage === "running" || stage === "walking") &&
+            (burrowDirection > 0
+              ? burrowProgress >= burrowHideProgress
+              : burrowProgress <= burrowHideProgress)
+          ) {
+            burrowHasHidden = true;
+            stage = "hiding";
+            speed = 0;
+          }
+          burrowPlan.getFloorPosition(burrowProgress, burrowTravel);
+          root.position.copy(burrowTravel);
+          burrowPlan.getDirectionAt(burrowProgress, burrowTravelDirection);
+          if (burrowDirection < 0) burrowTravelDirection.negate();
+          const desiredYaw = Math.atan2(
+            burrowTravelDirection.x,
+            burrowTravelDirection.z,
+          );
+          const yawDifference = Math.atan2(
+            Math.sin(desiredYaw - root.rotation.y),
+            Math.cos(desiredYaw - root.rotation.y),
+          );
+          root.rotation.y += THREE.MathUtils.clamp(
+            yawDifference,
+            -delta * 5.4,
+            delta * 5.4,
+          );
+          const reachedEnd = burrowDirection > 0
+            ? burrowProgress >= 0.965
+            : burrowProgress <= 0.035;
+          if (reachedEnd) {
+            burrowEmergence.copy(
+              burrowDirection > 0 ? burrowPlan.exit : burrowPlan.entry,
+            );
+            burrowEmergenceStartY = root.position.y;
+            context.onRevealBurrowExit(burrowPlan.id, burrowEmergence);
+            burrowPhase = "emerging";
+            stage = "emerging";
+            burrowDuration = 1.18;
+            burrowTimer = burrowDuration;
+            root.position.set(
+              burrowEmergence.x,
+              burrowEmergenceStartY,
+              burrowEmergence.z,
+            );
+          }
+        } else if (burrowPhase === "emerging") {
+          burrowTimer = Math.max(0, burrowTimer - delta);
+          const progress = 1 - burrowTimer / Math.max(0.001, burrowDuration);
+          root.position.x = burrowEmergence.x;
+          root.position.z = burrowEmergence.z;
+          root.position.y = THREE.MathUtils.lerp(
+            burrowEmergenceStartY,
+            burrowEmergence.y,
+            smoothstep(progress),
+          );
+          if (burrowTimer <= 0) {
+            burrowPhase = "surface";
+            stage = hits >= 3 ? "walking" : preBurrowStage;
+            speed = stage === "walking" ? BUNNY.walkSpeed : BUNNY.runSpeed;
+            root.position.y = getHeightAt(root.position.x, root.position.z);
+            objective = hasRecord || context.gramophoneStolen ? "flee" : "idle";
+            diversionFor = Math.max(diversionFor, 10);
+            burrowCooldown = 12 + Math.random() * 20;
+            if (objective === "flee") chooseEscapeFrom(context.playerPosition, 22, true);
+            else chooseDiversion(16);
+            burrowPlan = null;
+          }
+        }
+
+        updateAnimation(time, delta);
+        return;
+      }
+
       if (stage === "running" || stage === "walking") {
         if (pendingHitEvasion) {
+          if (objective === "burrow") burrowPlan = null;
           objective = "flee";
           chooseEscapeFrom(context.playerPosition, 20, true);
           pendingHitEvasion = false;
         }
 
+        const surfacePlayerDistance = Math.hypot(
+          root.position.x - context.playerPosition.x,
+          root.position.z - context.playerPosition.z,
+        );
+        if (surfacePlayerDistance <= 11.5 && objective !== "flee") {
+          if (objective === "burrow") burrowPlan = null;
+          objective = "flee";
+          diversionFor = Math.max(diversionFor, 3.2);
+          chooseEscapeFrom(context.playerPosition, 22, true);
+        }
+
+        const approachingBurrow = objective === "burrow" && burrowPlan !== null;
+        if (approachingBurrow && burrowPlan) {
+          movementTarget.copy(burrowPlan.entry);
+          if (
+            Math.hypot(
+              root.position.x - burrowPlan.entry.x,
+              root.position.z - burrowPlan.entry.z,
+            ) <= 1.45
+          ) {
+            startBurrow(burrowPlan);
+            updateAnimation(time, delta);
+            return;
+          }
+        }
+
         const canCarryNewLoot = !hasRecord && !context.gramophoneStolen;
         const canSeekRecord =
+          !approachingBurrow &&
           canCarryNewLoot &&
           context.droppedRecordPosition !== null &&
           diversionFor <= 0;
         const canSeekGramophone =
+          !approachingBurrow &&
           canCarryNewLoot &&
           context.gramophoneAvailable &&
           !context.gramophoneGuarded &&
           diversionFor <= 0;
 
-        if (canSeekRecord && context.droppedRecordPosition) {
+        if (approachingBurrow) {
+          objective = "burrow";
+        } else if (canSeekRecord && context.droppedRecordPosition) {
           objective = "record";
           movementTarget.copy(context.droppedRecordPosition);
           if (
@@ -521,6 +858,7 @@ export function createBunny(
             if (context.onStealRecord()) {
               hasRecord = true;
               if (record && !record.parent) scene.add(record);
+              if (record) record.visible = true;
               recordLight.intensity = 0.7;
               objective = "flee";
               diversionFor = 5;
@@ -561,8 +899,11 @@ export function createBunny(
           awayFromPlayer.subVectors(root.position, context.playerPosition);
           awayFromPlayer.y = 0;
           let hasPlayerDirection = false;
-          const pursuingLoot = objective === "record" || objective === "gramophone";
-          const mustDodgePlayer = !pursuingLoot;
+          const pursuingTarget =
+            objective === "record" ||
+            objective === "gramophone" ||
+            objective === "burrow";
+          const mustDodgePlayer = !pursuingTarget;
           if (mustDodgePlayer && awayFromPlayer.lengthSq() > 0.001) {
             hasPlayerDirection = true;
             awayFromPlayer.normalize();
@@ -608,7 +949,7 @@ export function createBunny(
             Math.sin(desiredYaw - root.rotation.y),
             Math.cos(desiredYaw - root.rotation.y),
           );
-          const turnRate = pursuingLoot ? 7.2 : stage === "walking" ? 2.7 : 4.1;
+          const turnRate = pursuingTarget ? 7.2 : stage === "walking" ? 2.7 : 4.1;
           const turnDelta = Math.min(delta, 0.05);
           root.rotation.y += THREE.MathUtils.clamp(
             yawDifference,
@@ -620,7 +961,7 @@ export function createBunny(
 
           actualMovementDirection
             .copy(travelDirection)
-            .lerp(moveDirection, pursuingLoot ? 0.72 : 0.35)
+            .lerp(moveDirection, pursuingTarget ? 0.72 : 0.35)
             .normalize();
           if (hasPlayerDirection) {
             const towardPlayer = actualMovementDirection.dot(awayFromPlayer);
@@ -654,23 +995,7 @@ export function createBunny(
       }
       root.position.y = getHeightAt(root.position.x, root.position.z);
 
-      if (mixer) {
-        if (stage === "stopped" || stage === "captured") {
-          mixer.timeScale += (0.035 - mixer.timeScale) * (1 - Math.exp(-7 * delta));
-        } else {
-          mixer.timeScale += (1 - mixer.timeScale) * (1 - Math.exp(-5 * delta));
-        }
-        mixer.update(delta);
-      } else if (character && (stage === "running" || stage === "walking")) {
-        character.rotation.z = Math.sin(time * (stage === "running" ? 12 : 5)) * 0.055;
-      }
-
-      hitPulse = Math.max(0, hitPulse - delta * 2.6);
-      const ringMaterial = targetRing.material as THREE.MeshBasicMaterial;
-      ringMaterial.color.set(hitPulse > 0 ? "#ff5d32" : stage === "stopped" ? "#d7e782" : "#efbc62");
-      ringMaterial.opacity = 0.45 + Math.sin(time * 4) * 0.16 + hitPulse * 0.32;
-      targetRing.scale.setScalar(1 + hitPulse * 0.5);
-      updateRecord(time);
+      updateAnimation(time, delta);
     },
     getHitPoint(target = hitPoint) {
       return target.copy(root.position).add(new THREE.Vector3(0, BUNNY.height * 0.52, 0));

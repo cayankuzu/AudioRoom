@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ASSETS, BLASTER, BUNNY, WORLD } from "../config";
+import type { BurrowSystemHandle } from "./burrows";
 import type { CollisionWorldHandle, ProjectileCollision } from "./collisionWorld";
 
 interface Projectile {
@@ -200,39 +201,14 @@ function cloneCarrot(template: THREE.Group): THREE.Group {
   return clone;
 }
 
-function buildWeapon(): THREE.Group {
+function buildHeldCarrot(): THREE.Group {
   const root = new THREE.Group();
-  root.name = "carrot-blaster";
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: "#342619",
-    roughness: 0.62,
-    metalness: 0.32,
-  });
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: "#d7612c",
-    emissive: "#461508",
-    emissiveIntensity: 0.32,
-    roughness: 0.48,
-    metalness: 0.38,
-  });
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, 0.62, 16), bodyMaterial);
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.z = -0.17;
-  const chamber = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.25, 18), accentMaterial);
-  chamber.rotation.z = Math.PI / 2;
-  chamber.position.set(0, -0.035, 0.1);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.38, 0.17), bodyMaterial);
-  grip.position.set(0, -0.22, 0.17);
-  grip.rotation.x = -0.22;
-  const sight = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.009, 8, 20), accentMaterial);
-  sight.position.set(0, 0.115, -0.44);
-  root.add(barrel, chamber, grip, sight);
+  root.name = "held-carrot";
 
-  const loadedCarrot = buildCarrot(0.38);
-  loadedCarrot.name = "loaded-carrot";
-  loadedCarrot.position.set(0, 0, -0.57);
-  loadedCarrot.rotation.x = Math.PI / 2;
-  root.add(loadedCarrot);
+  const fallbackCarrot = buildCarrot(1.45);
+  fallbackCarrot.name = "held-carrot-fallback";
+  fallbackCarrot.rotation.x = Math.PI / 2;
+  root.add(fallbackCarrot);
   return root;
 }
 
@@ -242,16 +218,17 @@ export function createCarrotBlaster(
   manager: THREE.LoadingManager,
   getHeightAt: (x: number, z: number) => number,
   collisionWorld: CollisionWorldHandle,
+  burrows?: Pick<BurrowSystemHandle, "isUndergroundPosition" | "resolveProjectile">,
 ): CarrotBlasterHandle {
-  const weapon = buildWeapon();
-  weapon.scale.setScalar(0.68);
-  weapon.position.set(0.46, -0.47, -1.06);
-  weapon.rotation.set(-0.045, -0.11, -0.045);
-  camera.add(weapon);
+  const heldCarrot = buildHeldCarrot();
+  heldCarrot.scale.setScalar(0.86);
+  heldCarrot.position.set(0.43, -0.42, -0.92);
+  heldCarrot.rotation.set(-0.03, -0.22, -0.12);
+  camera.add(heldCarrot);
 
   const muzzle = new THREE.PointLight("#ff8b45", 0, 3.2, 2);
-  muzzle.position.set(0, 0.02, -0.63);
-  weapon.add(muzzle);
+  muzzle.position.set(0, 0.02, -0.52);
+  heldCarrot.add(muzzle);
 
   const projectileRoot = new THREE.Group();
   scene.add(projectileRoot);
@@ -264,6 +241,7 @@ export function createCarrotBlaster(
   const groundNormal = new THREE.Vector3();
   const tangentialVelocity = new THREE.Vector3();
   const collisionNormal = new THREE.Vector3();
+  const tunnelCollisionNormal = new THREE.Vector3();
   const segment = new THREE.Vector3();
   const closestPoint = new THREE.Vector3();
   const slopeAcceleration = new THREE.Vector3();
@@ -294,23 +272,22 @@ export function createCarrotBlaster(
     carrotBodyTexture = bodyTexture;
     carrotLeavesTexture = leavesTexture;
     if (model) {
-        carrotTemplate = prepareCarrotModel(model, bodyTexture, leavesTexture);
-        const oldLoaded = weapon.getObjectByName("loaded-carrot");
-        if (oldLoaded) {
-          weapon.remove(oldLoaded);
-          oldLoaded.traverse((object) => {
-            if (!(object instanceof THREE.Mesh)) return;
-            object.geometry.dispose();
-            const materials = Array.isArray(object.material) ? object.material : [object.material];
-            materials.forEach((material) => material.dispose());
-          });
-        }
-        const loaded = cloneCarrot(carrotTemplate);
-        loaded.name = "loaded-carrot-model";
-        loaded.scale.setScalar(0.48);
-        loaded.position.set(0, 0, -0.57);
-        loaded.rotation.x = Math.PI / 2;
-        weapon.add(loaded);
+      carrotTemplate = prepareCarrotModel(model, bodyTexture, leavesTexture);
+      const fallback = heldCarrot.getObjectByName("held-carrot-fallback");
+      if (fallback) {
+        heldCarrot.remove(fallback);
+        fallback.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          object.geometry.dispose();
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach((material) => material.dispose());
+        });
+      }
+      const heldModel = cloneCarrot(carrotTemplate);
+      heldModel.name = "held-carrot-model";
+      heldModel.scale.setScalar(1.28);
+      heldModel.rotation.x = Math.PI / 2;
+      heldCarrot.add(heldModel);
     } else {
       console.warn("[Klostrofobik] Havuç modeli yüklenemedi, yedek form kullanılıyor.");
     }
@@ -437,8 +414,8 @@ export function createCarrotBlaster(
       elapsed += delta;
       recoil = Math.max(0, recoil - delta * 7.5);
       muzzleEnergy = Math.max(0, muzzleEnergy - delta * 15);
-      weapon.position.z = -1.06 + recoil * 0.075;
-      weapon.rotation.z = -0.045 + Math.sin(time * 1.8) * 0.006;
+      heldCarrot.position.z = -0.92 + recoil * 0.075;
+      heldCarrot.rotation.z = -0.12 + Math.sin(time * 1.8) * 0.008;
       muzzle.intensity = muzzleEnergy * 3.2;
       bunnyCenter.copy(bunnyPosition);
       bunnyCenter.y += BUNNY.height * 0.52;
@@ -505,6 +482,47 @@ export function createCarrotBlaster(
               continue;
             }
 
+            const underground = burrows?.isUndergroundPosition(projectile.object.position) ?? false;
+            if (
+              underground &&
+              burrows?.resolveProjectile(
+                projectile.object.position,
+                CARROT_RADIUS,
+                tunnelCollisionNormal,
+              )
+            ) {
+              const normalSpeed = projectile.velocity.dot(tunnelCollisionNormal);
+              if (normalSpeed < 0) {
+                const impactSpeed = -normalSpeed;
+                tangentialVelocity
+                  .copy(projectile.velocity)
+                  .addScaledVector(tunnelCollisionNormal, -normalSpeed);
+                projectile.velocity
+                  .copy(tangentialVelocity)
+                  .multiplyScalar(0.76)
+                  .addScaledVector(tunnelCollisionNormal, impactSpeed * 0.5);
+                projectile.bounceCount += 1;
+                projectile.spin = THREE.MathUtils.clamp(
+                  projectile.spin + impactSpeed * 0.75,
+                  -28,
+                  28,
+                );
+                projectile.impactCompression = 1;
+                if (impactSpeed > 2.8) {
+                  spawnGroundImpact(
+                    projectile.object.position,
+                    tunnelCollisionNormal,
+                    impactSpeed,
+                  );
+                }
+                if (projectile.velocity.length() < 1.15 && tunnelCollisionNormal.y > 0.35) {
+                  projectile.mode = "resting";
+                  projectile.velocity.set(0, 0, 0);
+                }
+              }
+              continue;
+            }
+
             const hitBunny =
               canHit &&
               !projectile.hitBunny &&
@@ -538,7 +556,7 @@ export function createCarrotBlaster(
               projectile.object.position.x,
               projectile.object.position.z,
             );
-            if (projectile.object.position.y <= ground + CARROT_RADIUS) {
+            if (!underground && projectile.object.position.y <= ground + CARROT_RADIUS) {
               terrainNormal(
                 getHeightAt,
                 projectile.object.position.x,
@@ -641,6 +659,11 @@ export function createCarrotBlaster(
             projectile.spin *= Math.exp(-0.18 * frameDelta);
           }
         } else if (projectile.mode === "rolling") {
+          if (burrows?.isUndergroundPosition(projectile.object.position)) {
+            projectile.mode = "resting";
+            projectile.velocity.set(0, 0, 0);
+            continue;
+          }
           terrainNormal(
             getHeightAt,
             projectile.object.position.x,
@@ -742,10 +765,10 @@ export function createCarrotBlaster(
       }
     },
     dispose() {
-      camera.remove(weapon);
+      camera.remove(heldCarrot);
       scene.remove(projectileRoot);
       while (projectiles.length > 0) removeProjectile(projectiles.length - 1);
-      weapon.traverse((object) => {
+      heldCarrot.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         object.geometry.dispose();
         const materials = Array.isArray(object.material)
