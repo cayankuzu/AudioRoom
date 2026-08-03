@@ -13,6 +13,7 @@ interface Projectile {
   spin: number;
   impactCompression: number;
   hitBunny: boolean;
+  settledTime: number;
 }
 
 interface BurstParticle {
@@ -20,6 +21,7 @@ interface BurstParticle {
   velocity: THREE.Vector3;
   age: number;
   lifetime: number;
+  baseScale: number;
 }
 
 export interface CarrotBlasterHandle {
@@ -32,6 +34,7 @@ export interface CarrotBlasterHandle {
     velocity: [number, number, number];
   }>;
   fire(): boolean;
+  setBudgets(activeProjectiles: number, particles: number): void;
   update(
     time: number,
     delta: number,
@@ -193,10 +196,9 @@ function cloneCarrot(template: THREE.Group): THREE.Group {
   const clone = template.clone(true);
   clone.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
-    object.geometry = object.geometry.clone();
-    object.material = Array.isArray(object.material)
-      ? object.material.map((material) => material.clone())
-      : object.material.clone();
+    // Geometri ve materyaller değişmez; yüzlerce kopyayı GPU belleğine çoğaltma.
+    object.castShadow = false;
+    object.receiveShadow = false;
   });
   return clone;
 }
@@ -234,6 +236,77 @@ export function createCarrotBlaster(
   scene.add(projectileRoot);
   const projectiles: Projectile[] = [];
   const burstParticles: BurstParticle[] = [];
+  const archiveCapacity = 512;
+  const archiveBodyGeometry = new THREE.ConeGeometry(0.09, 0.54, 8);
+  archiveBodyGeometry.translate(0, -0.02, 0);
+  const archiveLeafGeometries = Array.from({ length: 3 }, (_, index) => {
+    const geometry = new THREE.CapsuleGeometry(0.018, 0.17, 2, 4);
+    const transform = new THREE.Object3D();
+    transform.position.y = 0.3;
+    transform.rotation.z = (index - 1) * 0.42;
+    transform.rotation.y = index * 2.1;
+    transform.updateMatrix();
+    geometry.applyMatrix4(transform.matrix);
+    return geometry;
+  });
+  const archiveBodyMaterial = new THREE.MeshStandardMaterial({
+    color: "#ee6b25",
+    emissive: "#6b1c05",
+    emissiveIntensity: 0.16,
+    roughness: 0.78,
+  });
+  const archiveLeafMaterial = new THREE.MeshStandardMaterial({ color: "#719449", roughness: 0.9 });
+  const archiveMeshes = [
+    new THREE.InstancedMesh(archiveBodyGeometry, archiveBodyMaterial, archiveCapacity),
+    ...archiveLeafGeometries.map(
+      (geometry) => new THREE.InstancedMesh(geometry, archiveLeafMaterial, archiveCapacity),
+    ),
+  ];
+  archiveMeshes.forEach((mesh) => {
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    projectileRoot.add(mesh);
+  });
+  const particleGeometry = new THREE.TetrahedronGeometry(1, 0);
+  const particleMaterials = {
+    orange: new THREE.MeshBasicMaterial({
+      color: "#ff7b35",
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+    }),
+    leaf: new THREE.MeshBasicMaterial({
+      color: "#a7c766",
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+    }),
+    dustLight: new THREE.MeshBasicMaterial({
+      color: "#e4b566",
+      transparent: true,
+      opacity: 0.64,
+      depthWrite: false,
+    }),
+    dustDark: new THREE.MeshBasicMaterial({
+      color: "#9a632c",
+      transparent: true,
+      opacity: 0.64,
+      depthWrite: false,
+    }),
+  };
+  const particlePool: THREE.Mesh[] = Array.from({ length: 80 }, (_, index) => {
+    const particle = new THREE.Mesh(
+      particleGeometry,
+      index % 3 === 0 ? particleMaterials.leaf : particleMaterials.orange,
+    );
+    particle.visible = index === 0;
+    particle.scale.setScalar(0.0001);
+    particle.frustumCulled = false;
+    projectileRoot.add(particle);
+    return particle;
+  });
   const direction = new THREE.Vector3();
   const origin = new THREE.Vector3();
   const bunnyCenter = new THREE.Vector3();
@@ -259,6 +332,33 @@ export function createCarrotBlaster(
   let carrotTemplate: THREE.Group | null = null;
   let carrotBodyTexture: THREE.Texture | null = null;
   let carrotLeavesTexture: THREE.Texture | null = null;
+  let activeProjectileBudget = 36;
+  let particleBudget = 46;
+  let archiveCount = 0;
+  let archiveCursor = 0;
+  let particleWarmupFrames = 2;
+  const archiveMatrix = new THREE.Matrix4();
+
+  const acquireParticle = (
+    material: THREE.MeshBasicMaterial,
+    position: THREE.Vector3,
+    scale: number,
+  ): THREE.Mesh | null => {
+    const particle = particlePool.pop();
+    if (!particle) return null;
+    particle.material = material;
+    particle.position.copy(position);
+    particle.rotation.set(0, 0, 0);
+    particle.scale.setScalar(scale);
+    particle.visible = true;
+    return particle;
+  };
+
+  const releaseParticle = (particle: THREE.Mesh) => {
+    particle.visible = false;
+    particle.scale.setScalar(0.0001);
+    particlePool.push(particle);
+  };
 
   const textureLoader = new THREE.TextureLoader(manager);
   const modelPromise = new Promise<THREE.Group | null>((resolve) => {
@@ -297,30 +397,38 @@ export function createCarrotBlaster(
     const [projectile] = projectiles.splice(index, 1);
     if (!projectile) return;
     projectileRoot.remove(projectile.object);
-    projectile.object.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.geometry.dispose();
-      const materials = Array.isArray(object.material)
-        ? object.material
-        : [object.material];
-      materials.forEach((material) => material.dispose());
+  };
+
+  const archiveProjectile = (index: number) => {
+    const projectile = projectiles[index];
+    if (!projectile) return;
+    archiveMatrix.compose(
+      projectile.object.position,
+      projectile.object.quaternion,
+      projectile.object.scale,
+    );
+    archiveMeshes.forEach((mesh) => {
+      mesh.setMatrixAt(archiveCursor, archiveMatrix);
+      mesh.instanceMatrix.needsUpdate = true;
     });
+    archiveCursor = (archiveCursor + 1) % archiveCapacity;
+    archiveCount = Math.min(archiveCapacity, archiveCount + 1);
+    archiveMeshes.forEach((mesh) => {
+      mesh.count = archiveCount;
+    });
+    removeProjectile(index);
   };
 
   const spawnBurst = (position: THREE.Vector3) => {
-    for (let i = 0; i < 12; i += 1) {
-      const material = new THREE.MeshBasicMaterial({
-        color: i % 3 === 0 ? "#a7c766" : "#ff7b35",
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false,
-      });
-      const particle = new THREE.Mesh(
-        new THREE.TetrahedronGeometry(0.035 + Math.random() * 0.055, 0),
-        material,
+    const available = Math.max(0, particleBudget - burstParticles.length);
+    for (let i = 0; i < Math.min(9, available); i += 1) {
+      const particleScale = 0.035 + Math.random() * 0.055;
+      const particle = acquireParticle(
+        i % 3 === 0 ? particleMaterials.leaf : particleMaterials.orange,
+        position,
+        particleScale,
       );
-      particle.position.copy(position);
-      projectileRoot.add(particle);
+      if (!particle) break;
       burstParticles.push({
         object: particle,
         velocity: new THREE.Vector3(
@@ -330,6 +438,7 @@ export function createCarrotBlaster(
         ),
         age: 0,
         lifetime: 0.85,
+        baseScale: particleScale,
       });
     }
   };
@@ -339,20 +448,17 @@ export function createCarrotBlaster(
     normal: THREE.Vector3,
     strength: number,
   ) => {
-    const count = Math.min(7, Math.max(3, Math.round(strength * 0.32)));
+    const available = Math.max(0, particleBudget - burstParticles.length);
+    const count = Math.min(available, 5, Math.max(2, Math.round(strength * 0.26)));
     for (let index = 0; index < count; index += 1) {
-      const material = new THREE.MeshBasicMaterial({
-        color: index % 2 === 0 ? "#e4b566" : "#9a632c",
-        transparent: true,
-        opacity: 0.68,
-        depthWrite: false,
-      });
-      const particle = new THREE.Mesh(
-        new THREE.TetrahedronGeometry(0.018 + Math.random() * 0.024, 0),
-        material,
+      const particleScale = 0.018 + Math.random() * 0.024;
+      const particle = acquireParticle(
+        index % 2 === 0 ? particleMaterials.dustLight : particleMaterials.dustDark,
+        position,
+        particleScale,
       );
-      particle.position.copy(position).addScaledVector(normal, 0.025);
-      projectileRoot.add(particle);
+      if (!particle) break;
+      particle.position.addScaledVector(normal, 0.025);
       const lateral = new THREE.Vector3(
         Math.random() - 0.5,
         Math.random() * 0.32,
@@ -363,6 +469,7 @@ export function createCarrotBlaster(
         velocity: lateral.multiplyScalar(0.8 + strength * 0.055).addScaledVector(normal, 0.45),
         age: 0,
         lifetime: 0.42 + Math.random() * 0.2,
+        baseScale: particleScale,
       });
     }
   };
@@ -387,6 +494,12 @@ export function createCarrotBlaster(
       })),
     fire() {
       if (elapsed < BLASTER.cooldown) return false;
+      if (projectiles.length >= activeProjectileBudget) {
+        const settledIndex = projectiles.findIndex(
+          (projectile) => projectile.mode === "resting" || projectile.mode === "stuck",
+        );
+        if (settledIndex >= 0) archiveProjectile(settledIndex);
+      }
       elapsed = 0;
       recoil = 1;
       muzzleEnergy = 1;
@@ -407,10 +520,21 @@ export function createCarrotBlaster(
         spin: (Math.random() - 0.5) * 4,
         impactCompression: 0,
         hitBunny: false,
+        settledTime: 0,
       });
       return true;
     },
+    setBudgets(nextActiveProjectiles, nextParticles) {
+      activeProjectileBudget = THREE.MathUtils.clamp(Math.round(nextActiveProjectiles), 16, 64);
+      particleBudget = THREE.MathUtils.clamp(Math.round(nextParticles), 16, 80);
+    },
     update(time, delta, bunnyPosition, canHit, onHit) {
+      if (particleWarmupFrames > 0) {
+        particleWarmupFrames -= 1;
+        if (particleWarmupFrames === 0) particlePool.forEach((particle) => {
+          particle.visible = false;
+        });
+      }
       elapsed += delta;
       recoil = Math.max(0, recoil - delta * 7.5);
       muzzleEnergy = Math.max(0, muzzleEnergy - delta * 15);
@@ -745,6 +869,14 @@ export function createCarrotBlaster(
         projectile.impactCompression = Math.max(0, projectile.impactCompression - frameDelta * 8);
         const compression = projectile.impactCompression * 0.14;
         projectile.object.scale.set(1 + compression, 1 - compression, 1 + compression);
+        if (projectile.mode === "resting" || projectile.mode === "stuck") {
+          projectile.settledTime += frameDelta;
+          if (projectile.settledTime >= 0.55) {
+            archiveProjectile(i);
+          }
+        } else {
+          projectile.settledTime = 0;
+        }
       }
 
       for (let i = burstParticles.length - 1; i >= 0; i -= 1) {
@@ -754,12 +886,10 @@ export function createCarrotBlaster(
         particle.object.position.addScaledVector(particle.velocity, delta);
         particle.object.rotation.x += delta * 5;
         particle.object.rotation.y += delta * 4;
-        const material = particle.object.material as THREE.MeshBasicMaterial;
-        material.opacity = Math.max(0, 1 - particle.age / particle.lifetime);
+        const lifeScale = Math.max(0.04, 1 - particle.age / particle.lifetime);
+        particle.object.scale.setScalar(particle.baseScale * lifeScale);
         if (particle.age >= particle.lifetime) {
-          projectileRoot.remove(particle.object);
-          particle.object.geometry.dispose();
-          material.dispose();
+          releaseParticle(particle.object);
           burstParticles.splice(i, 1);
         }
       }
@@ -776,10 +906,15 @@ export function createCarrotBlaster(
           : [object.material];
         materials.forEach((material) => material.dispose());
       });
-      burstParticles.forEach((particle) => {
-        particle.object.geometry.dispose();
-        (particle.object.material as THREE.Material).dispose();
-      });
+      burstParticles.length = 0;
+      particlePool.length = 0;
+      particleGeometry.dispose();
+      Object.values(particleMaterials).forEach((material) => material.dispose());
+      archiveMeshes.forEach((mesh) => mesh.removeFromParent());
+      archiveBodyGeometry.dispose();
+      archiveLeafGeometries.forEach((geometry) => geometry.dispose());
+      archiveBodyMaterial.dispose();
+      archiveLeafMaterial.dispose();
       carrotTemplate?.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         object.geometry.dispose();

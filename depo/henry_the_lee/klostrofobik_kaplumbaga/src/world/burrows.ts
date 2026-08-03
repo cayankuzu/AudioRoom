@@ -52,6 +52,7 @@ export interface BurrowSystemHandle {
     forwardInput?: number,
   ): "inside" | "exited";
   getActiveFloorHeight(): number | null;
+  setDetail(detail: number): void;
   update(time: number, delta: number): void;
   snapshot(): BurrowSnapshot;
   dispose(): void;
@@ -72,7 +73,6 @@ interface TunnelRoute {
   samples: THREE.Vector3[];
   portals: [Portal, Portal];
   stashPosition: THREE.Vector3;
-  stashLight: THREE.PointLight;
   stashMarker: THREE.Group;
   age: number;
   hasStash: boolean;
@@ -132,6 +132,7 @@ function createTunnelTexture(): THREE.CanvasTexture {
 export function createBurrowSystem(
   scene: THREE.Scene,
   getHeightAt: (x: number, z: number) => number,
+  initialDetail = 1,
 ): BurrowSystemHandle {
   const root = new THREE.Group();
   root.name = "rabbit-burrow-network";
@@ -180,6 +181,39 @@ export function createBurrowSystem(
     side: THREE.DoubleSide,
     depthWrite: false,
   });
+  let detailLevel = THREE.MathUtils.clamp(initialDetail, 0.45, 1);
+  const portalSegments = detailLevel < 0.7 ? 24 : detailLevel < 0.9 ? 32 : 40;
+  const portalCircleGeometry = new THREE.CircleGeometry(1.34, portalSegments);
+  const portalRingGeometry = new THREE.RingGeometry(1.12, 1.52, portalSegments);
+  const portalTorusGeometry = new THREE.TorusGeometry(1.47, 0.2, 7, portalSegments);
+  const clodGeometry = new THREE.DodecahedronGeometry(1, 0);
+  const ribGeometry = new THREE.TorusGeometry(TUNNEL_RADIUS * 0.955, 0.025, 4, 14);
+  const sealedEndGeometry = new THREE.CircleGeometry(TUNNEL_RADIUS * 0.985, 24);
+  const tunnelSegmentGeometry = new THREE.CylinderGeometry(
+    TUNNEL_RADIUS,
+    TUNNEL_RADIUS,
+    1,
+    detailLevel < 0.65 ? 6 : detailLevel < 0.9 ? 8 : 10,
+    1,
+    true,
+  );
+  const tangentAxis = new THREE.Vector3(0, 0, 1);
+  const prewarmGeometry = new THREE.TetrahedronGeometry(0.001, 0);
+  const prewarmRoot = new THREE.Group();
+  const tunnelPrewarm = new THREE.Mesh(tunnelSegmentGeometry, tunnelMaterial);
+  tunnelPrewarm.scale.setScalar(0.0001);
+  tunnelPrewarm.frustumCulled = false;
+  prewarmRoot.add(tunnelPrewarm);
+  [portalDarkMaterial, soilMaterial, rimMaterial, ribMaterial, markerMaterial].forEach(
+    (material) => {
+      const mesh = new THREE.Mesh(prewarmGeometry, material);
+      mesh.scale.setScalar(0.0001);
+      mesh.frustumCulled = false;
+      prewarmRoot.add(mesh);
+    },
+  );
+  root.add(prewarmRoot);
+  let prewarmFrames = 2;
 
   const routes: TunnelRoute[] = [];
   const entrancePositions: THREE.Vector3[] = [];
@@ -204,7 +238,7 @@ export function createBurrowSystem(
     group.scale.setScalar(0.04);
 
     const darkness = new THREE.Mesh(
-      new THREE.CircleGeometry(1.34, 48),
+      portalCircleGeometry,
       portalDarkMaterial,
     );
     darkness.rotation.x = -Math.PI / 2;
@@ -212,13 +246,13 @@ export function createBurrowSystem(
     darkness.scale.z = 0.72;
     group.add(darkness);
 
-    const innerRim = new THREE.Mesh(new THREE.RingGeometry(1.12, 1.52, 48), rimMaterial);
+    const innerRim = new THREE.Mesh(portalRingGeometry, rimMaterial);
     innerRim.rotation.x = -Math.PI / 2;
     innerRim.position.y = 0.052;
     innerRim.scale.z = 0.72;
     group.add(innerRim);
 
-    const crater = new THREE.Mesh(new THREE.TorusGeometry(1.47, 0.2, 9, 48), soilMaterial);
+    const crater = new THREE.Mesh(portalTorusGeometry, soilMaterial);
     crater.rotation.x = Math.PI / 2;
     crater.scale.z = 0.72;
     crater.position.y = 0.08;
@@ -226,12 +260,11 @@ export function createBurrowSystem(
     crater.receiveShadow = true;
     group.add(crater);
 
-    for (let index = 0; index < 14; index += 1) {
-      const angle = (index / 14) * Math.PI * 2 + Math.random() * 0.16;
-      const clod = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(0.1 + Math.random() * 0.16, 0),
-        soilMaterial,
-      );
+    const clodCount = Math.round(8 + detailLevel * 5);
+    for (let index = 0; index < clodCount; index += 1) {
+      const angle = (index / clodCount) * Math.PI * 2 + Math.random() * 0.16;
+      const clod = new THREE.Mesh(clodGeometry, soilMaterial);
+      clod.scale.setScalar(0.1 + Math.random() * 0.16);
       const radius = 1.38 + Math.random() * 0.42;
       clod.position.set(
         Math.cos(angle) * radius,
@@ -409,24 +442,22 @@ export function createBurrowSystem(
       );
       const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.46);
       const curveLength = Math.max(1, curve.getLength());
-      const segments = Math.max(72, Math.ceil(curveLength * 4.2));
+      const segments = Math.max(34, Math.ceil(curveLength * (1.4 + detailLevel * 0.9)));
+      const radialSegments = detailLevel < 0.65 ? 6 : detailLevel < 0.9 ? 8 : 10;
       const tunnel = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, segments, TUNNEL_RADIUS, 16, false),
+        new THREE.TubeGeometry(curve, segments, TUNNEL_RADIUS, radialSegments, false),
         tunnelMaterial,
       );
       tunnel.name = "tunnel-interior";
       routeRoot.add(tunnel);
 
-      const ribCount = Math.max(5, Math.floor(curveLength / 4));
+      const ribCount = Math.max(4, Math.floor(curveLength / (detailLevel < 0.7 ? 8 : 6)));
       for (let index = 1; index < ribCount; index += 1) {
         const t = index / ribCount;
-        const rib = new THREE.Mesh(
-          new THREE.TorusGeometry(TUNNEL_RADIUS * 0.955, 0.025, 5, 20),
-          ribMaterial,
-        );
+        const rib = new THREE.Mesh(ribGeometry, ribMaterial);
         rib.position.copy(curve.getPointAt(t));
         rib.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
+          tangentAxis,
           curve.getTangentAt(t).normalize(),
         );
         routeRoot.add(rib);
@@ -446,22 +477,18 @@ export function createBurrowSystem(
       marker.position.y = 0.025;
       stashMarker.add(marker);
       routeRoot.add(stashMarker);
-      const stashLight = new THREE.PointLight("#f28a42", 0, 8.5, 2);
-      stashLight.position.copy(stashCenter);
-      routeRoot.add(stashLight);
-
       const portals: [Portal, Portal] = [
         createPortal(entry, true),
         createPortal(exit, false),
       ];
       const exitCap = new THREE.Mesh(
-        new THREE.CircleGeometry(TUNNEL_RADIUS * 0.985, 32),
+        sealedEndGeometry,
         darkMaterial,
       );
       exitCap.name = "sealed-tunnel-end";
       exitCap.position.copy(curve.getPointAt(1));
       exitCap.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1),
+        tangentAxis,
         curve.getTangentAt(1).normalize(),
       );
       exitCap.position.addScaledVector(curve.getTangentAt(1).normalize(), -0.025);
@@ -475,7 +502,6 @@ export function createBurrowSystem(
         samples,
         portals,
         stashPosition,
-        stashLight,
         stashMarker,
         age: 0,
         hasStash: false,
@@ -488,7 +514,6 @@ export function createBurrowSystem(
       if (!route) return;
       route.hasStash = true;
       route.stashMarker.visible = true;
-      route.stashLight.intensity = 3.8;
     },
     isNearEntrance(position, radius = 3.4) {
       return entrancePositions.some(
@@ -657,7 +682,14 @@ export function createBurrowSystem(
     getActiveFloorHeight() {
       return activeFloorHeight;
     },
+    setDetail(detail) {
+      detailLevel = THREE.MathUtils.clamp(detail, 0.45, 1);
+    },
     update(time, delta) {
+      if (prewarmFrames > 0) {
+        prewarmFrames -= 1;
+        if (prewarmFrames === 0) prewarmRoot.visible = false;
+      }
       transitionCooldown = Math.max(0, transitionCooldown - delta);
       for (const route of routes) {
         route.age += delta;
@@ -672,7 +704,6 @@ export function createBurrowSystem(
           portal.group.rotation.y = Math.sin(time * 0.38 + route.id) * 0.035;
         }
         if (route.hasStash) {
-          route.stashLight.intensity = 3.2 + Math.sin(time * 3.4 + route.id) * 0.65;
           route.stashMarker.rotation.y = time * 0.7;
         }
       }

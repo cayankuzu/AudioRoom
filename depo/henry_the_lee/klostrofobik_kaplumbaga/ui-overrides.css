@@ -13,6 +13,7 @@ body.is-overlay-open .hud,
 body.is-overlay-open .minimap,
 body.is-overlay-open .album-panel,
 body.is-overlay-open .capture-panel,
+body.is-overlay-open .graphics-settings,
 body.is-overlay-open .brand-footer,
 body.is-overlay-open .game-ui {
   opacity: 1;
@@ -22,6 +23,279 @@ body.is-overlay-open .game-ui {
 body.is-overlay-open .game-ui,
 body.is-overlay-open .brand-footer {
   pointer-events: none;
+}
+
+.graphics-settings {
+  position: fixed;
+  top: 6.7rem;
+  right: 1rem;
+  z-index: 86;
+  width: min(380px, calc(100vw - 2rem));
+  overflow: hidden;
+  border: 1px solid rgba(247, 230, 189, 0.2);
+  border-radius: 16px;
+  background: rgba(16, 12, 7, 0.96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px) scale(0.985);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.graphics-settings.is-open,
+body.is-overlay-open .graphics-settings {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.graphics-settings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1rem 0.85rem;
+  border-bottom: 1px solid rgba(247, 230, 189, 0.12);
+}
+
+.graphics-settings__head div {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.graphics-settings__head span {
+  color: rgba(247, 230, 189, 0.55);
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+}
+
+.graphics-settings__head strong {
+  color: #f7e6bd;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.graphics-settings__head button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(247, 230, 189, 0.17);
+  border-radius: 10px;
+  color: #f7e6bd;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.graphics-settings__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  padding: 0.85rem;
+}
+
+.graphics-settings__modes button {
+  display: grid;
+  gap: 0.32rem;
+  min-height: 76px;
+  padding: 0.75rem;
+  border: 1px solid rgba(247, 230, 189, 0.13);
+  border-radius: 11px;
+  color: #f7e6bd;
+  background: rgba(247, 230, 189, 0.035);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.graphics-settings__modes button:hover {
+  border-color: rgba(225, 107, 54, 0.65);
+  transform: translateY(-1px);
+}
+
+.graphics-settings__modes button.is-active {
+  border-color: #e16b36;
+  background: rgba(225, 107, 54, 0.15);
+}
+
+.graphics-settings__modes strong {
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+
+.graphics-settings__modes span {
+  color: rgba(247, 230, 189, 0.58);
+  font-size: 0.79rem;
+  line-height: 1.35;
+}
+
+.graphics-settings__telemetry {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid rgba(247, 230, 189, 0.1);
+  color: rgba(247, 230, 189, 0.66);
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.graphics-auto-notice {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 118;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  width: min(560px, calc(100vw - 2rem));
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(247, 230, 189, 0.2);
+  border-radius: 14px;
+  color: #f7e6bd;
+  background: rgba(17, 12, 6, 0.96);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -18px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.graphics-auto-notice.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.graphics-auto-notice__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: #171006;
+  background: #d7ad62;
+  font-size: 1rem;
+}
+
+.graphics-auto-notice > span:nth-child(2) {
+  display: grid;
+  gap: 0.15rem;
+  color: rgba(247, 230, 189, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.graphics-auto-notice strong {
+  color: #f7e6bd;
+  font-size: 0.95rem;
+}
+
+.graphics-auto-notice button {
+  border: 0;
+  color: rgba(247, 230, 189, 0.7);
+  background: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.desktop-only-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(217, 100, 49, 0.23), transparent 34%),
+    radial-gradient(circle at 82% 76%, rgba(129, 148, 84, 0.16), transparent 35%),
+    #171006;
+}
+
+.desktop-only-gate__signal {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+}
+
+.desktop-only-gate__signal i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30vmax;
+  aspect-ratio: 1;
+  border: 1px solid #d7ad62;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.desktop-only-gate__signal i:nth-child(2) { width: 54vmax; }
+.desktop-only-gate__signal i:nth-child(3) { width: 78vmax; }
+
+.desktop-only-gate__card {
+  position: relative;
+  width: min(520px, 100%);
+  padding: clamp(1.6rem, 7vw, 2.5rem);
+  border: 1px solid rgba(247, 230, 189, 0.22);
+  border-radius: 20px;
+  background: rgba(20, 14, 7, 0.94);
+  box-shadow: 14px 14px 0 rgba(217, 100, 49, 0.18), 0 40px 100px rgba(0, 0, 0, 0.55);
+}
+
+.desktop-only-gate__eyebrow {
+  color: #e16b36;
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.desktop-only-gate h1 {
+  margin: 0.65rem 0 1.2rem;
+  color: #f7e6bd;
+  font-size: clamp(2.6rem, 12vw, 5rem);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.82;
+  text-transform: uppercase;
+}
+
+.desktop-only-gate p,
+.desktop-only-gate strong {
+  display: block;
+  margin: 0 0 0.7rem;
+  color: rgba(247, 230, 189, 0.68);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.desktop-only-gate strong { color: #f7e6bd; }
+
+.desktop-only-gate a {
+  display: grid;
+  min-height: 52px;
+  margin-top: 1.4rem;
+  place-items: center;
+  border: 1px solid #d7ad62;
+  border-radius: 11px;
+  color: #171006;
+  background: #d7ad62;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 700px) {
+  .graphics-settings {
+    top: 0.6rem;
+    right: 0.6rem;
+    width: calc(100vw - 1.2rem);
+  }
+
+  .graphics-settings__modes {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Albüm oynatıcısı Mükemmel Boşluk düzenini korurken dar ekranlarda taşmasın. */

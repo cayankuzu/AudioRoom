@@ -2,9 +2,16 @@ import * as THREE from "three";
 import { createHud } from "../../../../shared/ui/hud";
 import { createMobileControls, type MobileControls } from "../../../../shared/ui/mobileControls";
 import { createCaptureControls } from "../../../../redd/mukemmel_bosluk/src/ui/captureControls";
-import { BUNNY, PLAYER, WORLD } from "../config";
+import { ASSETS, BUNNY, PLAYER, WORLD } from "../config";
 import { createInput } from "../systems/inputSystem";
+import {
+  createPerformanceManager,
+  getInitialGraphicsProfile,
+  getStoredGraphicsMode,
+  type GraphicsProfile,
+} from "../systems/performanceManager";
 import { createGameHud } from "../ui/gameHud";
+import { createGraphicsSettings } from "../ui/graphicsSettings";
 import { createInteractionHint } from "../ui/interactionHint";
 import { createMinimap } from "../ui/minimap";
 import { createSoundtrackPanel } from "../ui/soundtrackPanel";
@@ -61,6 +68,7 @@ interface DebugSnapshot {
   playerRecordState: string;
   burrows: ReturnType<ReturnType<typeof createBurrowSystem>["snapshot"]>;
   errors: string[];
+  performance: ReturnType<ReturnType<typeof createPerformanceManager>["snapshot"]>;
 }
 
 declare global {
@@ -96,19 +104,23 @@ export function startExperience(
 ): KlostrofobikExperience {
   document.body.classList.add("is-in-experience");
 
+  const initialGraphicsMode = getStoredGraphicsMode();
+  const initialGraphicsProfile = getInitialGraphicsProfile(initialGraphicsMode);
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: initialGraphicsProfile.tier !== "performance",
     powerPreference: "high-performance",
     stencil: false,
-    preserveDrawingBuffer: true,
+    preserveDrawingBuffer: false,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-  renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = initialGraphicsProfile.shadows;
+  renderer.shadowMap.type = initialGraphicsProfile.tier === "quality"
+    ? THREE.PCFSoftShadowMap
+    : THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  const performanceManager = createPerformanceManager(renderer, initialGraphicsMode);
   renderer.domElement.dataset.testid = "klostrofobik-canvas";
   container.appendChild(renderer.domElement);
 
@@ -120,7 +132,10 @@ export function startExperience(
   const keyLight = new THREE.DirectionalLight("#ffe0a2", 3.25);
   keyLight.position.set(-18, 34, 22);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1536, 1536);
+  keyLight.shadow.mapSize.set(
+    initialGraphicsProfile.shadowMapSize,
+    initialGraphicsProfile.shadowMapSize,
+  );
   keyLight.shadow.camera.left = -45;
   keyLight.shadow.camera.right = 45;
   keyLight.shadow.camera.top = 45;
@@ -145,10 +160,14 @@ export function startExperience(
   manager.onError = (url) => console.warn("[Klostrofobik] Varlık yüklenemedi:", url);
 
   const arena = createArena(scene, manager);
-  const burrows = createBurrowSystem(scene, arena.getHeightAt);
+  const burrows = createBurrowSystem(
+    scene,
+    arena.getHeightAt,
+    initialGraphicsProfile.tunnelDetail,
+  );
   const centerPiece = createCenterPiece(scene, manager, camera, (value) => {
     reportProgress(7 + value * 70, "Kaplumbağa merkezde uyanıyor…");
-  });
+  }, ASSETS.turtleModels[initialGraphicsProfile.tier]);
   const bunny = createBunny(scene, manager, arena.getHeightAt, (value) => {
     reportProgress(76 + value * 16, "Tavşan koşuya hazırlanıyor…");
   });
@@ -177,6 +196,31 @@ export function startExperience(
   const gameHud = createGameHud(document.body);
   const interactionHint = createInteractionHint(document.body);
   const minimap = createMinimap(document.body);
+  let collisionUpdateStride = initialGraphicsProfile.tier === "performance" ? 6 : 3;
+  let shadowUpdateStride = initialGraphicsProfile.tier === "quality" ? 1 : 3;
+  const applyGraphicsProfile = (profile: GraphicsProfile) => {
+    renderer.shadowMap.enabled = profile.shadows;
+    renderer.shadowMap.type = profile.tier === "quality"
+      ? THREE.PCFSoftShadowMap
+      : THREE.PCFShadowMap;
+    if (
+      keyLight.shadow.mapSize.width !== profile.shadowMapSize ||
+      keyLight.shadow.mapSize.height !== profile.shadowMapSize
+    ) {
+      keyLight.shadow.map?.dispose();
+      keyLight.shadow.map = null;
+      keyLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
+    }
+    collisionUpdateStride = profile.tier === "performance" ? 6 : profile.tier === "balanced" ? 3 : 2;
+    shadowUpdateStride = profile.tier === "quality" ? 1 : 3;
+    burrows.setDetail(profile.tunnelDetail);
+    blaster.setBudgets(profile.activeProjectileBudget, profile.particleBudget);
+  };
+  const graphicsSettings = createGraphicsSettings(
+    document.body,
+    performanceManager,
+    applyGraphicsProfile,
+  );
   const dropPosition = new THREE.Vector3();
   const dropForward = new THREE.Vector3();
   const computeDropPosition = () => {
@@ -237,6 +281,7 @@ export function startExperience(
         { key: "P", label: "Albüm paneli · plağı çıkar" },
         { key: "M", label: "Harita" },
         { key: "K", label: "Kontroller" },
+        { key: "G", label: "Grafik ayarları" },
         { key: "T", label: "Ekran görüntüsü" },
       ],
       [{ key: "Esc", label: "İmleci serbest bırak", tone: "hint" }],
@@ -492,6 +537,7 @@ export function startExperience(
     else if (event.code === "KeyK") controlsHud.toggle();
     else if (event.code === "KeyP") soundtrack.togglePanel();
     else if (event.code === "KeyM") minimap.toggle();
+    else if (event.code === "KeyG") graphicsSettings.toggle();
     else if (event.code === "KeyT") captureControls.takeScreenshot();
   };
 
@@ -522,30 +568,34 @@ export function startExperience(
     previousBunnyStage = bunny.stage;
     options.onProgress?.(100, "Takip hazır.");
     container.dataset.ready = "true";
+    window.setTimeout(() => graphicsSettings.showOptimizedNotice(), 1500);
   });
 
   const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    performanceManager.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", onResize);
 
   const clock = new THREE.Clock();
   let raf = 0;
+  let frameIndex = 0;
   const tick = () => {
     if (disposed) return;
     const rawDelta = clock.getDelta();
-    const delta = Math.min(rawDelta, 0.05);
+    const delta = Math.min(rawDelta, 1 / 30);
     const sprintDelta = input.isLocked() && readyState ? Math.min(rawDelta, 0.25) : 0;
     const time = clock.elapsedTime;
     const gameDelta = input.isLocked() && readyState ? delta : 0;
-    const bunnyDelta = input.isLocked() && readyState ? Math.min(rawDelta, 0.25) : 0;
+    const bunnyDelta = gameDelta;
+    frameIndex += 1;
+    if (input.isLocked() && readyState) performanceManager.sample(rawDelta);
 
     arena.update(time, delta);
     centerPiece.update(time, delta);
     burrows.update(time, delta);
-    collisionWorld.update();
+    if (frameIndex % collisionUpdateStride === 0) collisionWorld.update();
 
     if (input.isLocked()) {
       const look = input.consumeLook();
@@ -804,6 +854,9 @@ export function startExperience(
     victoryPulse = Math.max(0, victoryPulse - delta * 0.2);
     centerGlow.intensity = 18 + victoryPulse * 34 + Math.sin(time * 0.72) * 1.4;
 
+    if (renderer.shadowMap.enabled && frameIndex % shadowUpdateStride === 0) {
+      renderer.shadowMap.needsUpdate = true;
+    }
     renderer.render(scene, camera);
     raf = window.requestAnimationFrame(tick);
   };
@@ -840,6 +893,7 @@ export function startExperience(
       playerRecordState: playerRecord.state,
       burrows: burrows.snapshot(),
       errors: [...runtimeErrors],
+      performance: performanceManager.snapshot(),
     }),
     hitBunny: () => {
       if (readyState) handleBunnyHit();
@@ -946,6 +1000,8 @@ export function startExperience(
       offFullscreen();
       mobileControls?.dispose();
       captureControls.dispose();
+      graphicsSettings.dispose();
+      performanceManager.dispose();
       controlsHud.dispose();
       interactionHint.dispose();
       minimap.dispose();

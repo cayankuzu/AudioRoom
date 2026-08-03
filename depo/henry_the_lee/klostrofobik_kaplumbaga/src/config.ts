@@ -49,7 +49,15 @@ export const GRAMOPHONE = {
 
 export const ASSETS = {
   turtleModel:
-    "../../../henry_the_lee/klostrofobik_kaplumbaga/models/shellbound-turtle.glb",
+    "../../../henry_the_lee/klostrofobik_kaplumbaga/models/shellbound-turtle-quality.glb",
+  turtleModels: {
+    performance:
+      "../../../henry_the_lee/klostrofobik_kaplumbaga/models/shellbound-turtle-performance.glb",
+    balanced:
+      "../../../henry_the_lee/klostrofobik_kaplumbaga/models/shellbound-turtle-balanced.glb",
+    quality:
+      "../../../henry_the_lee/klostrofobik_kaplumbaga/models/shellbound-turtle-quality.glb",
+  },
   bunnyRunning:
     "../../../henry_the_lee/klostrofobik_kaplumbaga/models/dapper-bunny-running.glb",
   bunnyWalking:

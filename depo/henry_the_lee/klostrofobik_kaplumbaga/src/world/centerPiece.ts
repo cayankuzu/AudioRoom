@@ -195,6 +195,7 @@ export function createCenterPiece(
   manager: THREE.LoadingManager,
   camera: THREE.Camera,
   onModelProgress?: (value: number) => void,
+  modelUrl = ASSETS.turtleModel,
 ): CenterPieceHandle {
   const root = new THREE.Group();
   const colliders: THREE.Object3D[] = [];
@@ -232,7 +233,7 @@ export function createCenterPiece(
 
   const modelPromise = new Promise<THREE.Group>((resolve) => {
     loader.load(
-      ASSETS.turtleModel,
+      modelUrl,
       (gltf) => resolve(gltf.scene),
       (event) => {
         if (event.total > 0) onModelProgress?.(event.loaded / event.total);

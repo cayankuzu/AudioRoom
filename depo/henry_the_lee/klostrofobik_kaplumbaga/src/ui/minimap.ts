@@ -39,6 +39,7 @@ export function createMinimap(parent: HTMLElement): Minimap {
   const size = 220;
   const viewRadius = WORLD.radius;
   const scale = (size * 0.5) / viewRadius;
+  const worldOrigin = new THREE.Vector3();
 
   const applyCollapsed = () => {
     shell.classList.toggle("is-collapsed", collapsed);
@@ -72,7 +73,7 @@ export function createMinimap(parent: HTMLElement): Minimap {
   return {
     update(player, yaw, gramophone, bunny, recordOnBunny, droppedRecord, burrowEntrances) {
       const now = performance.now();
-      if (now - lastDraw < 33) return;
+      if (now - lastDraw < 100) return;
       lastDraw = now;
       ctx.clearRect(0, 0, size, size);
       ctx.save();
@@ -93,7 +94,7 @@ export function createMinimap(parent: HTMLElement): Minimap {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
       }
 
-      const center = point(new THREE.Vector3(), player);
+      const center = point(worldOrigin, player);
       ctx.strokeStyle = "rgba(220,200,180,.25)";
       ctx.beginPath();
       ctx.arc(center.x, center.y, 8.5 * scale, 0, Math.PI * 2);

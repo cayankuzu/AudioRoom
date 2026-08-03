@@ -9,8 +9,9 @@ import {
   requestFullscreen,
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
+import { isBlockedMobileDevice } from "../systems/performanceManager";
 
-const APP_VERSION = "v1.1.0";
+const APP_VERSION = "v1.2.0";
 
 declare global {
   interface Window {
@@ -21,6 +22,30 @@ declare global {
 export function bootstrapApp(root: HTMLElement): void {
   window.__audioroomCleanup?.();
   root.innerHTML = "";
+
+  if (isBlockedMobileDevice()) {
+    document.body.classList.add("is-mobile-blocked");
+    const blocker = document.createElement("main");
+    blocker.className = "desktop-only-gate";
+    blocker.innerHTML = `
+      <div class="desktop-only-gate__signal" aria-hidden="true"><i></i><i></i><i></i></div>
+      <section class="desktop-only-gate__card">
+        <span class="desktop-only-gate__eyebrow">MASAÜSTÜ DENEYİMİ</span>
+        <h1>Klostrofobik<br />Kaplumbağa</h1>
+        <p>Bu oyun klavye, fare ve masaüstü donanımı için hazırlandı.</p>
+        <strong>Lütfen bilgisayardaki bir web tarayıcısından girin.</strong>
+        <a href="../../../">AudioRoom'a dön</a>
+      </section>
+    `;
+    root.appendChild(blocker);
+    window.__audioroomCleanup = () => {
+      blocker.remove();
+      root.innerHTML = "";
+      document.body.classList.remove("is-mobile-blocked");
+      delete window.__audioroomCleanup;
+    };
+    return;
+  }
 
   const container = document.createElement("div");
   container.id = "experience";
