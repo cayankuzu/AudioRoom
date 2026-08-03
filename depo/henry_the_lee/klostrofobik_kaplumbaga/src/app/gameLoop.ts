@@ -121,10 +121,14 @@ export function startExperience(
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
-  renderer.shadowMap.enabled = initialGraphicsProfile.shadows;
-  renderer.shadowMap.type = initialGraphicsProfile.tier === "ultra"
-    ? THREE.PCFSoftShadowMap
-    : THREE.PCFShadowMap;
+  // Renderer tarafÄ±ndaki shadow pipeline oturum boyunca aÃ§Ä±k kalÄ±r. DÃ¼ÅŸÃ¼k
+  // profilde maliyeti, gÃ¶lge Ã¼reten Ä±ÅŸÄ±ÄŸÄ± kapatarak sÄ±fÄ±rlÄ±yoruz; global
+  // pipeline'Ä± kapatÄ±p aÃ§mak GLTF shader programlarÄ±nÄ± geÃ§ersizleÅŸtiriyordu.
+  renderer.shadowMap.enabled = true;
+  // Three r184'te PCFShadowMap bazÄ± GLTF dokularÄ±yla karÅŸÄ±laÅŸtÄ±rmalÄ±
+  // sampler uyuÅŸmazlÄ±ÄŸÄ± Ã¼retebiliyor. GÃ¶lge algoritmasÄ±nÄ± profil geÃ§iÅŸinde
+  // deÄŸiÅŸtirmemek, shader ve shadow texture biÃ§imini oturum boyunca tutarlÄ± tutar.
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
   const performanceManager = createPerformanceManager(renderer, initialGraphicsMode);
   renderer.domElement.dataset.testid = "klostrofobik-canvas";
@@ -137,11 +141,11 @@ export function startExperience(
   scene.add(new THREE.HemisphereLight("#f0d9a3", "#25291a", 2.25));
   const keyLight = new THREE.DirectionalLight("#ffe0a2", 3.25);
   keyLight.position.set(-18, 34, 22);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(
-    initialGraphicsProfile.shadowMapSize,
-    initialGraphicsProfile.shadowMapSize,
-  );
+  keyLight.castShadow = initialGraphicsProfile.shadows;
+  // Shadow render target boyutunu Ã§alÄ±ÅŸma anÄ±nda deÄŸiÅŸtirmek GPU dokusunu
+  // yeniden yaratÄ±p bazÄ± sÃ¼rÃ¼cÃ¼lerde boÅŸ kare Ã¼retiyor. Sabit 1024 tampon;
+  // profiller arasÄ±ndaki kaliteyi gÃ¼ncelleme sÄ±klÄ±ÄŸÄ±yla ayÄ±rÄ±yoruz.
+  keyLight.shadow.mapSize.set(1024, 1024);
   keyLight.shadow.camera.left = -45;
   keyLight.shadow.camera.right = 45;
   keyLight.shadow.camera.top = 45;
@@ -149,6 +153,10 @@ export function startExperience(
   keyLight.shadow.camera.near = 1;
   keyLight.shadow.camera.far = 90;
   scene.add(keyLight);
+  // autoUpdate kapalÄ±yken ilk ana render'dan Ã¶nce geÃ§erli bir depth texture
+  // Ã¼retmek zorundayÄ±z. Aksi halde Orta/YÃ¼ksek profilleri ilk 1-2 karede
+  // karÅŸÄ±laÅŸtÄ±rma sampler'Ä±na boÅŸ renk dokusu baÄŸlayÄ±p sahneyi Ã§izemiyor.
+  renderer.shadowMap.needsUpdate = initialGraphicsProfile.shadows;
   const centerGlow = new THREE.PointLight("#db6132", 18, 34, 2);
   centerGlow.position.set(0, 8, 0);
   scene.add(centerGlow);
@@ -205,17 +213,10 @@ export function startExperience(
   let collisionUpdateStride = initialGraphicsProfile.tier === "low" ? 6 : 3;
   let shadowUpdateStride = initialGraphicsProfile.tier === "ultra" ? 1 : 3;
   const applyGraphicsProfile = (profile: GraphicsProfile) => {
-    renderer.shadowMap.enabled = profile.shadows;
-    renderer.shadowMap.type = profile.tier === "ultra"
-      ? THREE.PCFSoftShadowMap
-      : THREE.PCFShadowMap;
-    if (
-      keyLight.shadow.mapSize.width !== profile.shadowMapSize ||
-      keyLight.shadow.mapSize.height !== profile.shadowMapSize
-    ) {
-      keyLight.shadow.map?.dispose();
-      keyLight.shadow.map = null;
-      keyLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
+    const shadowsWereEnabled = keyLight.castShadow;
+    keyLight.castShadow = profile.shadows;
+    if (profile.shadows && !shadowsWereEnabled) {
+      renderer.shadowMap.needsUpdate = true;
     }
     collisionUpdateStride = profile.tier === "low" ? 6 : profile.tier === "medium" ? 4 : profile.tier === "high" ? 3 : 2;
     shadowUpdateStride = profile.tier === "ultra" ? 1 : profile.tier === "high" ? 2 : 3;
@@ -860,7 +861,7 @@ export function startExperience(
     victoryPulse = Math.max(0, victoryPulse - delta * 0.2);
     centerGlow.intensity = 18 + victoryPulse * 34 + Math.sin(time * 0.72) * 1.4;
 
-    if (renderer.shadowMap.enabled && frameIndex % shadowUpdateStride === 0) {
+    if (keyLight.castShadow && frameIndex % shadowUpdateStride === 0) {
       renderer.shadowMap.needsUpdate = true;
     }
     renderer.render(scene, camera);

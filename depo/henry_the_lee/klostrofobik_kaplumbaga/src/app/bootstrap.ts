@@ -11,7 +11,7 @@ import {
 } from "../utils/fullscreen";
 import { isBlockedMobileDevice } from "../systems/performanceManager";
 
-const APP_VERSION = "v1.3.0";
+const APP_VERSION = "v1.3.1";
 
 declare global {
   interface Window {

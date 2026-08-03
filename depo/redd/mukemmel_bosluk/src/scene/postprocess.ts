@@ -198,6 +198,9 @@ export function createPostProcess(
   const composer = new EffectComposer(renderer, target);
   composer.setPixelRatio(pr);
   composer.setSize(size.x, size.y);
+  let appliedWidth = size.x;
+  let appliedHeight = size.y;
+  let appliedPixelRatio = pr;
 
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
@@ -225,8 +228,20 @@ export function createPostProcess(
       lift: gradingPass.uniforms.uLift,
     },
     resize(width, height, pixelRatio) {
-      if (typeof pixelRatio === "number") composer.setPixelRatio(pixelRatio);
-      composer.setSize(width, height);
+      const nextPixelRatio = typeof pixelRatio === "number"
+        ? pixelRatio
+        : appliedPixelRatio;
+      const pixelRatioChanged = Math.abs(appliedPixelRatio - nextPixelRatio) > 0.001;
+      const sizeChanged = appliedWidth !== width || appliedHeight !== height;
+      if (!pixelRatioChanged && !sizeChanged) return;
+
+      // EffectComposer.setPixelRatio() mevcut mantÄ±ksal boyutla zaten setSize()
+      // Ã§aÄŸÄ±rÄ±r. Profil seÃ§iminde ikinci kez render target ayÄ±rmÄ±yoruz.
+      if (pixelRatioChanged) composer.setPixelRatio(nextPixelRatio);
+      if (sizeChanged) composer.setSize(width, height);
+      appliedWidth = width;
+      appliedHeight = height;
+      appliedPixelRatio = nextPixelRatio;
     },
     tick(time) {
       gradingPass.uniforms.uTime.value = time;

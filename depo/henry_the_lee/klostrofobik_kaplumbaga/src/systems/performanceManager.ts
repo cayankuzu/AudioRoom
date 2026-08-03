@@ -81,13 +81,20 @@ const PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     label: "Ultra",
     minPixelRatio: 0.9,
     maxPixelRatio: 1.5,
-    initialPixelRatio: 1.35,
+    initialPixelRatio: 1.45,
     shadows: true,
     shadowMapSize: 1536,
     tunnelDetail: 1,
     particleBudget: 64,
     activeProjectileBudget: 48,
   },
+};
+
+const MAX_RENDER_PIXELS: Record<GraphicsTier, number> = {
+  low: 1_800_000,
+  medium: 3_200_000,
+  high: 5_200_000,
+  ultra: 8_000_000,
 };
 
 function readHardwareNumber(name: "deviceMemory" | "hardwareConcurrency", fallback: number): number {
@@ -184,6 +191,18 @@ function adjacentTier(tier: GraphicsTier, direction: -1 | 1): GraphicsTier {
   return order[index];
 }
 
+function initialPixelRatioForMode(
+  mode: GraphicsMode,
+  profile: GraphicsProfile,
+): number {
+  // Manuel profiller birbirinden gerÃ§ekten ayrÄ±lsÄ±n: YÃ¼ksek ve Ultra,
+  // DPR=1 ekranda da supersampling yapar. GPU render-pixel bÃ¼tÃ§esi daha sonra
+  // aÅŸÄ±rÄ± bÃ¼yÃ¼k framebuffer oluÅŸmasÄ±nÄ± engeller.
+  return mode === "auto"
+    ? Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio)
+    : profile.initialPixelRatio;
+}
+
 export function createPerformanceManager(
   renderer: THREE.WebGLRenderer,
   initialMode = getStoredGraphicsMode(),
@@ -191,7 +210,7 @@ export function createPerformanceManager(
   let mode = initialMode;
   let profile = getInitialGraphicsProfile(mode);
   let pixelRatio = THREE.MathUtils.clamp(
-    Math.min(window.devicePixelRatio, profile.initialPixelRatio),
+    initialPixelRatioForMode(mode, profile),
     profile.minPixelRatio,
     profile.maxPixelRatio,
   );
@@ -203,11 +222,54 @@ export function createPerformanceManager(
   let smoothedFrameMs = 16.67;
   let slowSeconds = 0;
   let adjustmentCooldown = 0;
+  let disposed = false;
+  let resizeFrame = 0;
+  const rendererSize = new THREE.Vector2();
+  renderer.getSize(rendererSize);
+  let appliedWidth = Math.max(1, Math.floor(rendererSize.x));
+  let appliedHeight = Math.max(1, Math.floor(rendererSize.y));
+  let appliedPixelRatio = renderer.getPixelRatio();
+  const gl = renderer.getContext();
+  const maxRenderbufferSize = Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) || 4096;
   const listeners = new Set<(profile: GraphicsProfile, snapshot: PerformanceSnapshot) => void>();
 
-  const applySize = () => {
-    renderer.setPixelRatio(pixelRatio);
-    renderer.setSize(width, height, false);
+  const clampPixelRatioToGpu = (requestedPixelRatio: number) => {
+    const renderPixelLimit = Math.sqrt(
+      MAX_RENDER_PIXELS[profile.tier] / Math.max(1, width * height),
+    );
+    const renderbufferLimit = maxRenderbufferSize / Math.max(1, width, height);
+    return Math.max(
+      0.5,
+      Math.min(requestedPixelRatio, renderPixelLimit, renderbufferLimit),
+    );
+  };
+
+  const commitSize = () => {
+    if (disposed) return;
+    resizeFrame = 0;
+    pixelRatio = clampPixelRatioToGpu(pixelRatio);
+    const pixelRatioChanged = Math.abs(appliedPixelRatio - pixelRatio) > 0.001;
+    const sizeChanged = appliedWidth !== width || appliedHeight !== height;
+    if (!pixelRatioChanged && !sizeChanged) return;
+
+    if (pixelRatioChanged) renderer.setPixelRatio(pixelRatio);
+    if (sizeChanged) renderer.setSize(width, height, false);
+
+    appliedWidth = width;
+    appliedHeight = height;
+    appliedPixelRatio = pixelRatio;
+  };
+
+  const applySize = (immediate = false) => {
+    if (disposed) return;
+    if (immediate) {
+      if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = 0;
+      commitSize();
+      return;
+    }
+    if (resizeFrame) return;
+    resizeFrame = window.requestAnimationFrame(commitSize);
   };
 
   const snapshot = (): PerformanceSnapshot => ({
@@ -228,14 +290,14 @@ export function createPerformanceManager(
   const applyProfile = (nextTier: GraphicsTier, resetResolution: boolean) => {
     profile = PROFILES[nextTier];
     if (resetResolution) {
-      pixelRatio = Math.min(window.devicePixelRatio, profile.initialPixelRatio);
+      pixelRatio = initialPixelRatioForMode(mode, profile);
     }
     pixelRatio = THREE.MathUtils.clamp(pixelRatio, profile.minPixelRatio, profile.maxPixelRatio);
     applySize();
     notify();
   };
 
-  applySize();
+  applySize(true);
 
   return {
     get profile() {
@@ -306,6 +368,9 @@ export function createPerformanceManager(
     },
     snapshot,
     dispose() {
+      disposed = true;
+      if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = 0;
       listeners.clear();
     },
   };

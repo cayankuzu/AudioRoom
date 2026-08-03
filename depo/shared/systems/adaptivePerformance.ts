@@ -89,6 +89,13 @@ const PROFILES: Record<GraphicsTier, AdaptiveGraphicsProfile> = {
 
 const TIER_ORDER: readonly GraphicsTier[] = ["low", "medium", "high", "ultra"];
 
+const MAX_RENDER_PIXELS: Record<GraphicsTier, number> = {
+  low: 1_800_000,
+  medium: 3_200_000,
+  high: 5_200_000,
+  ultra: 8_000_000,
+};
+
 function readHardwareNumber(
   name: "deviceMemory" | "hardwareConcurrency",
   fallback: number,
@@ -189,6 +196,18 @@ function adjacentTier(tier: GraphicsTier, direction: -1 | 1): GraphicsTier {
   return TIER_ORDER[index];
 }
 
+function initialPixelRatioForMode(
+  mode: GraphicsMode,
+  profile: AdaptiveGraphicsProfile,
+): number {
+  // Otomatik mod cihazÄ±n doÄŸal DPR'Ä±nÄ± aÅŸmaz. Manuel YÃ¼ksek/Ultra ise
+  // gerÃ§ekten daha net bir gÃ¶rÃ¼ntÃ¼ Ã¼retmek iÃ§in supersampling kullanabilir;
+  // aÅŸaÄŸÄ±daki GPU piksel bÃ¼tÃ§esi yine gÃ¼venli Ã¼st sÄ±nÄ±rÄ± uygular.
+  return mode === "auto"
+    ? Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio)
+    : profile.initialPixelRatio;
+}
+
 export function createAdaptivePerformanceManager(
   renderer: THREE.WebGLRenderer,
   options: AdaptivePerformanceOptions,
@@ -196,7 +215,7 @@ export function createAdaptivePerformanceManager(
   let mode = readGraphicsMode(options.storageKey);
   let profile = getAdaptiveGraphicsProfile(mode);
   let pixelRatio = THREE.MathUtils.clamp(
-    Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio),
+    initialPixelRatioForMode(mode, profile),
     profile.minPixelRatio,
     profile.maxPixelRatio,
   );
@@ -210,16 +229,60 @@ export function createAdaptivePerformanceManager(
   let stableSeconds = 0;
   let adjustmentCooldown = 0;
   let disposed = false;
+  let resizeFrame = 0;
+  const rendererSize = new THREE.Vector2();
+  renderer.getSize(rendererSize);
+  let appliedWidth = Math.max(1, Math.floor(rendererSize.x));
+  let appliedHeight = Math.max(1, Math.floor(rendererSize.y));
+  let appliedPixelRatio = renderer.getPixelRatio();
+  const gl = renderer.getContext();
+  const maxRenderbufferSize = Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) || 4096;
   const listeners = new Set<(
     profile: AdaptiveGraphicsProfile,
     snapshot: AdaptivePerformanceSnapshot,
   ) => void>();
 
-  const applySize = () => {
+  const clampPixelRatioToGpu = (requestedPixelRatio: number) => {
+    const renderPixelLimit = Math.sqrt(
+      MAX_RENDER_PIXELS[profile.tier] / Math.max(1, width * height),
+    );
+    const renderbufferLimit = maxRenderbufferSize / Math.max(1, width, height);
+    return Math.max(
+      0.5,
+      Math.min(requestedPixelRatio, renderPixelLimit, renderbufferLimit),
+    );
+  };
+
+  const commitSize = () => {
     if (disposed) return;
-    renderer.setPixelRatio(pixelRatio);
-    renderer.setSize(width, height, false);
+    resizeFrame = 0;
+    pixelRatio = clampPixelRatioToGpu(pixelRatio);
+    const pixelRatioChanged = Math.abs(appliedPixelRatio - pixelRatio) > 0.001;
+    const sizeChanged = appliedWidth !== width || appliedHeight !== height;
+    if (!pixelRatioChanged && !sizeChanged) return;
+
+    // Three.js setPixelRatio() kendi iÃ§inde mevcut boyutla setSize() Ã§aÄŸÄ±rÄ±r.
+    // YalnÄ±zca gerÃ§ekten gereken ikinci boyutlandÄ±rmayÄ± yaparak GPU tamponlarÄ±nÄ±
+    // aynÄ± tÄ±klamada iki kez oluÅŸturmaktan kaÃ§Ä±nÄ±yoruz.
+    if (pixelRatioChanged) renderer.setPixelRatio(pixelRatio);
+    if (sizeChanged) renderer.setSize(width, height, false);
+
+    appliedWidth = width;
+    appliedHeight = height;
+    appliedPixelRatio = pixelRatio;
     options.onResolutionChange?.(width, height, pixelRatio);
+  };
+
+  const applySize = (immediate = false) => {
+    if (disposed) return;
+    if (immediate) {
+      if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = 0;
+      commitSize();
+      return;
+    }
+    if (resizeFrame) return;
+    resizeFrame = window.requestAnimationFrame(commitSize);
   };
 
   const snapshot = (): AdaptivePerformanceSnapshot => ({
@@ -240,7 +303,7 @@ export function createAdaptivePerformanceManager(
   const applyProfile = (tier: GraphicsTier, resetResolution: boolean) => {
     profile = PROFILES[tier];
     if (resetResolution) {
-      pixelRatio = Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio);
+      pixelRatio = initialPixelRatioForMode(mode, profile);
     }
     pixelRatio = THREE.MathUtils.clamp(
       pixelRatio,
@@ -251,7 +314,7 @@ export function createAdaptivePerformanceManager(
     notify();
   };
 
-  applySize();
+  applySize(true);
 
   return {
     get profile() {
@@ -347,6 +410,8 @@ export function createAdaptivePerformanceManager(
     snapshot,
     dispose() {
       disposed = true;
+      if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = 0;
       listeners.clear();
     },
   };

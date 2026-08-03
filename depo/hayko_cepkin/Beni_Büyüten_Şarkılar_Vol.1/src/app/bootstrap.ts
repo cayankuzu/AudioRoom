@@ -11,7 +11,7 @@ import {
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
 
-const APP_VERSION = "v1.2.0";
+const APP_VERSION = "v1.2.1";
 
 export function bootstrapApp(root: HTMLElement): void {
   root.innerHTML = "";

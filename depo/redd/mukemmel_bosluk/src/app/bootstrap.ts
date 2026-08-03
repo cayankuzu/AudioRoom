@@ -10,7 +10,7 @@ import {
 } from "../utils/fullscreen";
 import { startExperience } from "./gameLoop";
 
-const APP_VERSION = "v2.4.0";
+const APP_VERSION = "v2.4.1";
 
 /**
  * AudioRoom kök hub'ından bu sayfaya gelindiğinde **ara kütüphane yok**:
