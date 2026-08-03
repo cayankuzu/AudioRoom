@@ -2,6 +2,8 @@ export type LibraryReleaseType = "album" | "single" | "ep";
 
 export type LibraryAvailability = "available" | "soon";
 
+export type LibraryDeviceSupport = "desktop" | "mobile-desktop";
+
 export interface LibraryTheme {
   accent: string;
   aura: string;
@@ -25,6 +27,7 @@ export interface LibraryExperience {
   path?: string;
   releaseType: LibraryReleaseType;
   availability: LibraryAvailability;
+  deviceSupport: LibraryDeviceSupport;
   worldLabel: string;
   detailHeadline: string;
   albumSummary: string;
@@ -47,6 +50,7 @@ export interface LibraryEntryMetadata {
   path?: string;
   releaseType: LibraryReleaseType;
   availability: LibraryAvailability;
+  deviceSupport: LibraryDeviceSupport;
   theme: LibraryTheme;
   trackTitles: readonly string[];
   directTrackUrls?: Partial<Record<string, string>>;

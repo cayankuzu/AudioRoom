@@ -54,6 +54,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     path: "./depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/",
     releaseType: "album",
     availability: "available",
+    deviceSupport: "desktop",
     theme: {
       accent: "#ff8f57",
       aura: "rgba(255, 143, 87, 0.42)",
@@ -74,6 +75,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     path: "./depo/henry_the_lee/kuantum_dolanıklığı/",
     releaseType: "single",
     availability: "available",
+    deviceSupport: "desktop",
     theme: {
       accent: "#e7d45a",
       aura: "rgba(231, 212, 90, 0.34)",
@@ -97,6 +99,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     path: "./depo/henry_the_lee/klostrofobik_kaplumbaga/",
     releaseType: "single",
     availability: "available",
+    deviceSupport: "desktop",
     theme: {
       accent: "#d6b36d",
       aura: "rgba(214, 179, 109, 0.34)",
@@ -121,6 +124,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     path: "./depo/redd/mukemmel_bosluk/",
     releaseType: "album",
     availability: "available",
+    deviceSupport: "mobile-desktop",
     theme: {
       accent: "#efe8dc",
       aura: "rgba(239, 232, 220, 0.34)",
@@ -140,6 +144,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     cover: "./covers/redd-21.jpg",
     releaseType: "album",
     availability: "soon",
+    deviceSupport: "desktop",
     theme: {
       accent: "#ff5f76",
       aura: "rgba(255, 95, 118, 0.36)",
@@ -158,6 +163,7 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     cover: "./covers/dark-side-of-the-moon.jpg",
     releaseType: "album",
     availability: "soon",
+    deviceSupport: "desktop",
     theme: {
       accent: "#8ec7ff",
       aura: "rgba(116, 186, 255, 0.32)",

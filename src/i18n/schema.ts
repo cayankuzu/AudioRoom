@@ -1,5 +1,6 @@
 import type {
   LibraryAvailability,
+  LibraryDeviceSupport,
   LibraryEntryCopy,
   LibraryReleaseType,
 } from "../content/library.types";
@@ -18,6 +19,12 @@ export interface LibraryUiCopy {
   mobileHints: {
     orientationTitle: string;
     orientationDescription: string;
+  };
+  mobileWorldGate: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    dismiss: string;
   };
   engagement: {
     title: string;
@@ -67,5 +74,6 @@ export interface LibraryLocaleBundle {
   ui: LibraryUiCopy;
   releaseTypeLabels: Record<LibraryReleaseType, string>;
   availabilityLabels: Record<LibraryAvailability, string>;
+  deviceSupportLabels: Record<LibraryDeviceSupport, string>;
   entries: Record<string, LibraryEntryCopy>;
 }

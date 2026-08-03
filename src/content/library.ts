@@ -9,6 +9,7 @@ import type {
 
 export type {
   LibraryAvailability,
+  LibraryDeviceSupport,
   LibraryEntryCopy,
   LibraryEntryMetadata,
   LibraryExperience,
@@ -83,6 +84,7 @@ export const LIBRARY_EXPERIENCES: readonly LibraryExperience[] =
       path: entry.path,
       releaseType: entry.releaseType,
       availability: entry.availability,
+      deviceSupport: entry.deviceSupport,
       worldLabel: copy.worldLabel,
       detailHeadline: copy.detailHeadline,
       albumSummary: copy.albumSummary,
@@ -99,6 +101,7 @@ export const LIBRARY_EXPERIENCES: readonly LibraryExperience[] =
         entry.releaseType,
         libraryLocale.releaseTypeLabels[entry.releaseType],
         libraryLocale.availabilityLabels[entry.availability],
+        libraryLocale.deviceSupportLabels[entry.deviceSupport],
         copy.worldLabel,
         copy.detailHeadline,
         copy.albumSummary,

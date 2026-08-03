@@ -15,6 +15,13 @@ export const trLibraryLocale: LibraryLocaleBundle = {
       orientationDescription:
         "Mümkünse klavye ve mouse bağlanabilen cihazlarda veya geniş ekranlarda kullanın.",
     },
+    mobileWorldGate: {
+      eyebrow: "Masaüstü deneyimi",
+      title: "Bu evren mobilde açılamıyor",
+      description:
+        "Mobilde yalnızca Mükemmel Boşluk evrenine girilebilir. Bu evreni klavye, fare ve geniş ekranlı bir bilgisayarda açın.",
+      dismiss: "Kütüphanede kal",
+    },
     engagement: {
       title: "Topluluk",
       likes: "Beğeni",
@@ -75,6 +82,10 @@ export const trLibraryLocale: LibraryLocaleBundle = {
   availabilityLabels: {
     available: "Yayında",
     soon: "Yakında",
+  },
+  deviceSupportLabels: {
+    desktop: "Masaüstü",
+    "mobile-desktop": "Mobil + Masaüstü",
   },
   entries: {
     "beni-buyuten-sarkilar-vol-1": {

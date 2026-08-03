@@ -10,6 +10,7 @@ import {
   getAlbumFilterOptions,
   getArtistFilterOptions,
   getAvailabilityLabel,
+  getDeviceSupportLabel,
   getReleaseTypeLabel,
   hasActiveLibraryFilters,
   toggleFilterValue,
@@ -546,6 +547,9 @@ export function renderLibraryHome(
             </span>
             <span class="orbit-type-badge orbit-type-badge--${experience.availability}">
               ${escapeHtml(getAvailabilityLabel(experience.availability))}
+            </span>
+            <span class="orbit-type-badge orbit-type-badge--device-${experience.deviceSupport}">
+              ${escapeHtml(getDeviceSupportLabel(experience.deviceSupport))}
             </span>
           </div>
         </div>

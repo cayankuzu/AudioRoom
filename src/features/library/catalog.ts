@@ -1,6 +1,7 @@
 import {
   LIBRARY_EXPERIENCES,
   type LibraryAvailability,
+  type LibraryDeviceSupport,
   type LibraryExperience,
   type LibraryReleaseType,
 } from "../../content/library";
@@ -53,6 +54,10 @@ export function getReleaseTypeLabel(type: LibraryReleaseType): string {
 
 export function getAvailabilityLabel(status: LibraryAvailability): string {
   return libraryLocale.availabilityLabels[status];
+}
+
+export function getDeviceSupportLabel(support: LibraryDeviceSupport): string {
+  return libraryLocale.deviceSupportLabels[support];
 }
 
 export function sortLibraryExperiences(

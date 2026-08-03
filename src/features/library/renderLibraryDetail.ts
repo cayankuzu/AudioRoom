@@ -2,6 +2,7 @@ import { type LibraryExperience } from "../../content/library";
 import { getLibraryLocale } from "../../i18n";
 import {
   getAvailabilityLabel,
+  getDeviceSupportLabel,
   getReleaseTypeLabel,
 } from "./catalog";
 import { renderLibraryEngagementBar } from "./renderLibraryEngagementBar";
@@ -59,7 +60,7 @@ export function renderLibraryDetail(
   const hasLiveWorld = Boolean(isLiveWorld && experience.path);
   const worldAction = hasLiveWorld
     ? `
-        <a class="detail-hero__cta detail-hero__cta--primary" href="${escapeAttribute(experience.path ?? "")}">
+        <a class="detail-hero__cta detail-hero__cta--primary" data-world-launch href="${escapeAttribute(experience.path ?? "")}">
           ${escapeHtml(ui.actions.enterWorld)}
         </a>
       `
@@ -124,6 +125,9 @@ export function renderLibraryDetail(
           </span>
           <span class="orbit-type-badge orbit-type-badge--${experience.availability}">
             ${escapeHtml(getAvailabilityLabel(experience.availability))}
+          </span>
+          <span class="orbit-type-badge orbit-type-badge--device-${experience.deviceSupport}">
+            ${escapeHtml(getDeviceSupportLabel(experience.deviceSupport))}
           </span>
         </div>
       </section>
@@ -196,14 +200,87 @@ export function renderLibraryDetail(
 
       ${renderLibraryFooter()}
     </div>
+
+    <div class="mobile-world-gate" data-mobile-world-gate hidden>
+      <button class="mobile-world-gate__backdrop" type="button" data-mobile-world-gate-dismiss aria-label="${escapeAttribute(ui.mobileWorldGate.dismiss)}"></button>
+      <section
+        class="mobile-world-gate__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-world-gate-title"
+        aria-describedby="mobile-world-gate-description"
+      >
+        <p class="mobile-world-gate__eyebrow">${escapeHtml(ui.mobileWorldGate.eyebrow)}</p>
+        <h2 id="mobile-world-gate-title">${escapeHtml(ui.mobileWorldGate.title)}</h2>
+        <p id="mobile-world-gate-description">${escapeHtml(ui.mobileWorldGate.description)}</p>
+        <button class="mobile-world-gate__dismiss" type="button" data-mobile-world-gate-dismiss>
+          ${escapeHtml(ui.mobileWorldGate.dismiss)}
+        </button>
+      </section>
+    </div>
   `;
 
   root.appendChild(shell);
 
   const portraitToast =
     shell.querySelector<HTMLElement>("[data-portrait-toast]");
+  const worldLaunch =
+    shell.querySelector<HTMLAnchorElement>("[data-world-launch]");
+  const mobileWorldGate =
+    shell.querySelector<HTMLElement>("[data-mobile-world-gate]");
+  const mobileWorldGateDismissButtons =
+    shell.querySelectorAll<HTMLButtonElement>("[data-mobile-world-gate-dismiss]");
+  const mobileWorldGateFocusTarget =
+    shell.querySelector<HTMLButtonElement>(".mobile-world-gate__dismiss");
   let portraitToastInterval = 0;
   let portraitToastHideTimeout = 0;
+  let bodyOverflowBeforeGate = "";
+
+  const isMobileWorldDevice = () => {
+    const hasCoarsePointer =
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(any-pointer: coarse)").matches;
+
+    return hasCoarsePointer || (navigator.maxTouchPoints > 0 && window.innerWidth <= 1180);
+  };
+
+  const setMobileWorldGateVisible = (visible: boolean) => {
+    if (!mobileWorldGate) {
+      return;
+    }
+
+    mobileWorldGate.hidden = !visible;
+    mobileWorldGate.setAttribute("aria-hidden", visible ? "false" : "true");
+    if (visible) {
+      bodyOverflowBeforeGate = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      window.requestAnimationFrame(() => mobileWorldGateFocusTarget?.focus());
+      return;
+    }
+
+    document.body.style.overflow = bodyOverflowBeforeGate;
+    worldLaunch?.focus();
+  };
+
+  const onWorldLaunch = (event: MouseEvent) => {
+    if (experience.deviceSupport !== "desktop" || !isMobileWorldDevice()) {
+      return;
+    }
+
+    event.preventDefault();
+    setMobileWorldGateVisible(true);
+  };
+
+  const onMobileWorldGateDismiss = () => {
+    setMobileWorldGateVisible(false);
+  };
+
+  const onDocumentKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && mobileWorldGate && !mobileWorldGate.hidden) {
+      event.preventDefault();
+      setMobileWorldGateVisible(false);
+    }
+  };
 
   const setPortraitToastVisible = (visible: boolean) => {
     if (!portraitToast) {
@@ -264,12 +341,25 @@ export function renderLibraryDetail(
 
   window.addEventListener("resize", onResize);
   window.addEventListener("orientationchange", onResize);
+  worldLaunch?.addEventListener("click", onWorldLaunch);
+  mobileWorldGateDismissButtons.forEach((button) => {
+    button.addEventListener("click", onMobileWorldGateDismiss);
+  });
+  document.addEventListener("keydown", onDocumentKeyDown);
   syncPortraitToastLoop();
 
   return () => {
     stopPortraitToastLoop();
+    if (mobileWorldGate && !mobileWorldGate.hidden) {
+      document.body.style.overflow = bodyOverflowBeforeGate;
+    }
     window.removeEventListener("resize", onResize);
     window.removeEventListener("orientationchange", onResize);
+    worldLaunch?.removeEventListener("click", onWorldLaunch);
+    mobileWorldGateDismissButtons.forEach((button) => {
+      button.removeEventListener("click", onMobileWorldGateDismiss);
+    });
+    document.removeEventListener("keydown", onDocumentKeyDown);
   };
 }
 
