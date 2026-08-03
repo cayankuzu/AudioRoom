@@ -27,6 +27,7 @@ const HUD_SECTIONS = [
     { key: "M", label: "Harita" },
     { key: "K", label: "Kontroller" },
     { key: "L", label: "Parlaklık ve kontrast" },
+    { key: "F2", label: "Grafik ayarları" },
     { key: "T", label: "Ekran görüntüsü" },
   ],
   [{ key: "Esc", label: "İmleci serbest bırak", tone: "hint" }],

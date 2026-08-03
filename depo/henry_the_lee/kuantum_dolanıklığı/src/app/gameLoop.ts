@@ -31,6 +31,8 @@ import {
   requestFullscreen,
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
+import { createAdaptivePerformanceManager } from "../../../../shared/systems/adaptivePerformance";
+import { createGraphicsSettings } from "../../../../shared/ui/graphicsSettings";
 
 export interface ExperienceHandle {
   requestLock(): void;
@@ -58,6 +60,9 @@ export interface ExperienceHandle {
  */
 export function startExperience(container: HTMLElement): ExperienceHandle {
   const renderer = createRenderer(container);
+  const performanceManager = createAdaptivePerformanceManager(renderer, {
+    storageKey: "audioroom-kuantum-dolanikligi-graphics-v1",
+  });
   const scene = createScene();
   const camera = createCamera();
   /**
@@ -78,6 +83,15 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const waveFloor = createWaveFloor(scene);
   /** İki katmanlı atmosfer tozu — `WORLD.half` ile ölçeklenir. */
   const particles = createParticles(scene);
+  let secondaryUpdateStride = performanceManager.profile.secondaryUpdateStride;
+  const graphicsSettings = createGraphicsSettings(
+    document.body,
+    performanceManager,
+    (profile) => {
+      secondaryUpdateStride = profile.secondaryUpdateStride;
+      particles.group.visible = profile.tier !== "low";
+    },
+  );
   const center = createCenterPiece(scene);
   void center.ready;
 
@@ -341,22 +355,27 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     document.body.classList.toggle("is-fullscreen", isFullscreen());
   }
 
+  let optimizedNoticeShown = false;
   const offMobileLock = input.onLockChange((locked) => {
-    if (!input.isTouch) return;
-    mobileControls?.setVisible(locked);
+    if (input.isTouch) mobileControls?.setVisible(locked);
+    if (locked && !optimizedNoticeShown) {
+      optimizedNoticeShown = true;
+      graphicsSettings.showOptimizedNotice();
+    }
   });
 
   /** ── Resize ───────────────────────────────────────────────────── */
   const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    performanceManager.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", onResize);
 
   /** ── RAF döngüsü ──────────────────────────────────────────────── */
   const clock = new THREE.Clock();
   let raf = 0;
+  let frameIndex = 0;
   const tmpPlatter = new THREE.Vector3();
   const tmpGramWorld = new THREE.Vector3();
   const tmpCatMarker = { position: new THREE.Vector3(), color: "rgba(220,220,220,0.85)", radius: 3 };
@@ -364,6 +383,8 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const tick = () => {
     const delta = Math.min(clock.getDelta(), 0.05);
     const time = clock.elapsedTime;
+    frameIndex += 1;
+    performanceManager.sample(delta);
 
     /** Önce zemini güncelle ki diğer sistemler doğru getHeightAt() okusun. */
     waveFloor.update(time);
@@ -371,7 +392,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       waveFloor.addRipple(sx, sz, time);
     });
 
-    particles.update(time, delta);
+    if (particles.group.visible) particles.update(time, delta);
     worldLights.update(time);
     center.update(time, delta);
     gramophone.update(time, delta, waveFloor.getHeightAt);
@@ -423,7 +444,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     measurement.update(time);
 
     /** ── UI: minimap (kedi marker'ı dahil) ────────────────────── */
-    if (minimap) {
+    if (minimap && frameIndex % secondaryUpdateStride === 0) {
       tmpCatMarker.position.copy(cat.position);
       minimap.update(
         movement.pose.position,
@@ -510,6 +531,8 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       hint?.dispose();
       pill?.dispose();
       albumPanel?.dispose();
+      graphicsSettings.dispose();
+      performanceManager.dispose();
       cat.dispose();
       scene.remove(particles.group);
       renderer.dispose();

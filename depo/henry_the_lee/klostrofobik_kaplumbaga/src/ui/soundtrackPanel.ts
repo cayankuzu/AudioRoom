@@ -31,7 +31,7 @@ interface YTNamespace {
   ) => YTPlayer;
 }
 
-type YTWindow = Window & {
+type YTWindow = {
   YT?: YTNamespace;
   onYouTubeIframeAPIReady?: () => void;
 };
@@ -39,7 +39,7 @@ type YTWindow = Window & {
 let apiReadyPromise: Promise<void> | null = null;
 
 function ensureIframeApi(): Promise<void> {
-  const ytWindow = window as YTWindow;
+  const ytWindow = window as unknown as YTWindow;
   if (ytWindow.YT?.Player) return Promise.resolve();
   if (apiReadyPromise) return apiReadyPromise;
 
@@ -194,7 +194,7 @@ export function createSoundtrackPanel(
   };
 
   void ensureIframeApi().then(() => {
-    const ytWindow = window as YTWindow;
+    const ytWindow = window as unknown as YTWindow;
     if (disposed || !frameHost || !ytWindow.YT?.Player) return;
     player = new ytWindow.YT.Player(frameHost, {
       width: "100%",

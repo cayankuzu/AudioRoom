@@ -1,7 +1,9 @@
 import {
   createHud as createSharedHud,
-  type Hud,
+  type Hud as SharedHud,
 } from "../../../../shared/ui/hud";
+
+export type Hud = SharedHud;
 
 export interface HudOptions {
   showLibraryBack?: boolean;
@@ -24,6 +26,7 @@ const HUD_SECTIONS = [
     { key: "M", label: "Harita", tone: "hint" },
     { key: "P", label: "Albüm paneli", tone: "hint" },
     { key: "K", label: "Kontroller", tone: "hint" },
+    { key: "F2", label: "Grafik ayarları", tone: "hint" },
   ],
   [{ key: "Esc", label: "İmleci serbest bırak", tone: "hint" }],
 ] as const;

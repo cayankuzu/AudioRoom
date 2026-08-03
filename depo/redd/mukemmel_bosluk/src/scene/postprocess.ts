@@ -25,7 +25,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
  */
 export interface PostProcessHandle {
   composer: EffectComposer;
-  resize(width: number, height: number): void;
+  resize(width: number, height: number, pixelRatio?: number): void;
   /** Her frame çağırılır — grain animasyonu için zaman uniform'u tazelenir. */
   tick(time: number): void;
   grading: {
@@ -224,7 +224,8 @@ export function createPostProcess(
       grainStrength: gradingPass.uniforms.uGrainStrength,
       lift: gradingPass.uniforms.uLift,
     },
-    resize(width, height) {
+    resize(width, height, pixelRatio) {
+      if (typeof pixelRatio === "number") composer.setPixelRatio(pixelRatio);
       composer.setSize(width, height);
     },
     tick(time) {

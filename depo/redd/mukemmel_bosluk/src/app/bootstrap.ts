@@ -10,6 +10,8 @@ import {
 } from "../utils/fullscreen";
 import { startExperience } from "./gameLoop";
 
+const APP_VERSION = "v2.4.0";
+
 /**
  * AudioRoom kök hub'ından bu sayfaya gelindiğinde **ara kütüphane yok**:
  * doğrudan 3B deneyim kurulur (içerideki `startOverlay` hâlâ pointer-lock +
@@ -21,7 +23,7 @@ import { startExperience } from "./gameLoop";
 export function bootstrapApp(root: HTMLElement): void {
   root.innerHTML = "";
 
-  createBrandFooter(document.body);
+  createBrandFooter(document.body, APP_VERSION);
 
   const loader = createLoadingOverlay(document.body);
   loader.show();

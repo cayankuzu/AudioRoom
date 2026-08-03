@@ -8,6 +8,8 @@ import { addLights } from "../scene/lights";
 import { createSky } from "../scene/sky";
 import { createAtmosphere } from "../scene/atmosphere";
 import { createPostProcess } from "../scene/postprocess";
+import { createAdaptivePerformanceManager } from "../../../../shared/systems/adaptivePerformance";
+import { createGraphicsSettings } from "../../../../shared/ui/graphicsSettings";
 
 import { createTerrain } from "../world/terrain";
 import { createRocks } from "../world/rocks";
@@ -79,6 +81,28 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
    * yine sRGB'dir (OutputPass bunu sonuca yazar).
    */
   const post = createPostProcess(renderer, scene, camera);
+  const performanceManager = createAdaptivePerformanceManager(renderer, {
+    storageKey: "audioroom-mukemmel-bosluk-graphics-v1",
+    onResolutionChange: (width, height, pixelRatio) => {
+      post.resize(width, height, pixelRatio);
+    },
+  });
+  const graphicsSettings = createGraphicsSettings(
+    document.body,
+    performanceManager,
+    (profile) => {
+      renderer.shadowMap.enabled = profile.tier !== "low";
+      lights.sun.castShadow = profile.tier !== "low";
+      const shadowSize = profile.tier === "ultra" ? 2048 : profile.tier === "high" ? 1536 : 1024;
+      if (lights.sun.shadow.mapSize.width !== shadowSize) {
+        lights.sun.shadow.map?.dispose();
+        lights.sun.shadow.map = null;
+        lights.sun.shadow.mapSize.set(shadowSize, shadowSize);
+      }
+      post.grading.grainStrength.value =
+        profile.tier === "low" ? 0 : profile.tier === "medium" ? 0.004 : 0.01;
+    },
+  );
 
   const terrain = createTerrain();
   scene.add(terrain.mesh);
@@ -520,19 +544,23 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     albumPanel.refreshInventory();
   });
 
+  let optimizedNoticeShown = false;
   const offMobileLock = input.onLockChange((locked) => {
     /**
      * Mobilde duraklayınca kontrolleri gizle — pause kartını tıklaması
      * yanlışlıkla D-pad'e değmesin.
      */
     mobileControls?.setVisible(locked);
+    if (locked && !optimizedNoticeShown) {
+      optimizedNoticeShown = true;
+      graphicsSettings.showOptimizedNotice();
+    }
   });
 
   const resize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    post.resize(window.innerWidth, window.innerHeight);
+    performanceManager.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", resize);
 
@@ -579,6 +607,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   function animate() {
     const delta = Math.min(clock.getDelta(), 0.033);
     const time = clock.elapsedTime;
+    performanceManager.sample(delta);
 
     /** Rüzgar her zaman güncellenir — atmosfer, kamera ve ambient bundan besleniyor. */
     wind.update(time, delta);
@@ -679,12 +708,15 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       mobileControls?.dispose();
       captureControls.dispose();
       brightness.dispose();
+      graphicsSettings.dispose();
+      performanceManager.dispose();
       albumPanel.dispose();
       interactionHint.dispose();
       minimap.dispose();
       hud.dispose();
       ambient.dispose();
       input.dispose();
+      post.dispose();
       document.body.classList.remove(
         "is-in-experience",
         "is-touch",

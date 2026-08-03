@@ -1,8 +1,10 @@
 import {
   createMobileControls as createSharedMobileControls,
-  type MobileControls,
+  type MobileControls as SharedMobileControls,
 } from "../../../../shared/ui/mobileControls";
 import type { InputHandle } from "../systems/inputSystem";
+
+export type MobileControls = SharedMobileControls;
 
 export interface MobileControlsOptions {
   onToggleMap: () => void;

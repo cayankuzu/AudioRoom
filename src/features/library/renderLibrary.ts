@@ -3,7 +3,6 @@ import { createEmptyLibraryFilters } from "./catalog";
 import { getLibraryRoute } from "./router";
 import {
   renderLibraryHome,
-  type FilterSectionKey,
   type LibraryHomeState,
 } from "./renderLibraryHome";
 import { renderLibraryDetail } from "./renderLibraryDetail";

@@ -17,7 +17,8 @@ export function createRenderer(container: HTMLElement): THREE.WebGLRenderer {
      */
     preserveDrawingBuffer: true,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.85));
+  /** İlk kare güvenli DPR ile açılır; ortak performans yöneticisi cihazı ölçüp yükseltir. */
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;

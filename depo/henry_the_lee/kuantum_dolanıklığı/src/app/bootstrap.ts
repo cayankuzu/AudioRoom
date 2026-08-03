@@ -2,6 +2,8 @@ import { startExperience } from "./gameLoop";
 import { createBrandFooter } from "../ui/brandFooter";
 import { createStartOverlay } from "../ui/startOverlay";
 import { bindExperienceGate } from "../../../../shared/app/experienceGate";
+import { readInputDeviceProfile } from "../../../../shared/app/inputDeviceProfile";
+import { createDesktopOnlyGate } from "../../../../shared/ui/desktopOnlyGate";
 import {
   isFullscreen,
   isFullscreenSupported,
@@ -9,8 +11,18 @@ import {
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
 
+const APP_VERSION = "v1.4.0";
+
 export function bootstrapApp(root: HTMLElement): void {
   root.innerHTML = "";
+
+  if (readInputDeviceProfile().isTouchOnly) {
+    createDesktopOnlyGate(root, {
+      title: "Kuantum Dolanıklığı",
+      description: "Ölçüm ve hareket sistemi hassas klavye-fare kontrolü gerektirir.",
+    });
+    return;
+  }
 
   const container = document.createElement("div");
   container.id = "experience";
@@ -33,5 +45,5 @@ export function bootstrapApp(root: HTMLElement): void {
     },
   });
 
-  createBrandFooter(document.body);
+  createBrandFooter(document.body, APP_VERSION);
 }

@@ -195,7 +195,7 @@ export function createCenterPiece(
   manager: THREE.LoadingManager,
   camera: THREE.Camera,
   onModelProgress?: (value: number) => void,
-  modelUrl = ASSETS.turtleModel,
+  modelUrl: string = ASSETS.turtleModel,
 ): CenterPieceHandle {
   const root = new THREE.Group();
   const colliders: THREE.Object3D[] = [];

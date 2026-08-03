@@ -98,6 +98,12 @@ function horizontalDistance(a: THREE.Vector3, b: THREE.Vector3): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
+function turtleLodForTier(tier: GraphicsProfile["tier"]): keyof typeof ASSETS.turtleModels {
+  if (tier === "low") return "performance";
+  if (tier === "ultra") return "quality";
+  return "balanced";
+}
+
 export function startExperience(
   container: HTMLElement,
   options: ExperienceOptions = {},
@@ -107,7 +113,7 @@ export function startExperience(
   const initialGraphicsMode = getStoredGraphicsMode();
   const initialGraphicsProfile = getInitialGraphicsProfile(initialGraphicsMode);
   const renderer = new THREE.WebGLRenderer({
-    antialias: initialGraphicsProfile.tier !== "performance",
+    antialias: initialGraphicsProfile.tier !== "low",
     powerPreference: "high-performance",
     stencil: false,
     preserveDrawingBuffer: false,
@@ -116,7 +122,7 @@ export function startExperience(
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = initialGraphicsProfile.shadows;
-  renderer.shadowMap.type = initialGraphicsProfile.tier === "quality"
+  renderer.shadowMap.type = initialGraphicsProfile.tier === "ultra"
     ? THREE.PCFSoftShadowMap
     : THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
@@ -167,7 +173,7 @@ export function startExperience(
   );
   const centerPiece = createCenterPiece(scene, manager, camera, (value) => {
     reportProgress(7 + value * 70, "Kaplumbağa merkezde uyanıyor…");
-  }, ASSETS.turtleModels[initialGraphicsProfile.tier]);
+  }, ASSETS.turtleModels[turtleLodForTier(initialGraphicsProfile.tier)]);
   const bunny = createBunny(scene, manager, arena.getHeightAt, (value) => {
     reportProgress(76 + value * 16, "Tavşan koşuya hazırlanıyor…");
   });
@@ -196,11 +202,11 @@ export function startExperience(
   const gameHud = createGameHud(document.body);
   const interactionHint = createInteractionHint(document.body);
   const minimap = createMinimap(document.body);
-  let collisionUpdateStride = initialGraphicsProfile.tier === "performance" ? 6 : 3;
-  let shadowUpdateStride = initialGraphicsProfile.tier === "quality" ? 1 : 3;
+  let collisionUpdateStride = initialGraphicsProfile.tier === "low" ? 6 : 3;
+  let shadowUpdateStride = initialGraphicsProfile.tier === "ultra" ? 1 : 3;
   const applyGraphicsProfile = (profile: GraphicsProfile) => {
     renderer.shadowMap.enabled = profile.shadows;
-    renderer.shadowMap.type = profile.tier === "quality"
+    renderer.shadowMap.type = profile.tier === "ultra"
       ? THREE.PCFSoftShadowMap
       : THREE.PCFShadowMap;
     if (
@@ -211,8 +217,8 @@ export function startExperience(
       keyLight.shadow.map = null;
       keyLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
     }
-    collisionUpdateStride = profile.tier === "performance" ? 6 : profile.tier === "balanced" ? 3 : 2;
-    shadowUpdateStride = profile.tier === "quality" ? 1 : 3;
+    collisionUpdateStride = profile.tier === "low" ? 6 : profile.tier === "medium" ? 4 : profile.tier === "high" ? 3 : 2;
+    shadowUpdateStride = profile.tier === "ultra" ? 1 : profile.tier === "high" ? 2 : 3;
     burrows.setDetail(profile.tunnelDetail);
     blaster.setBudgets(profile.activeProjectileBudget, profile.particleBudget);
   };
@@ -281,7 +287,7 @@ export function startExperience(
         { key: "P", label: "Albüm paneli · plağı çıkar" },
         { key: "M", label: "Harita" },
         { key: "K", label: "Kontroller" },
-        { key: "G", label: "Grafik ayarları" },
+        { key: "F2", label: "Grafik ayarları" },
         { key: "T", label: "Ekran görüntüsü" },
       ],
       [{ key: "Esc", label: "İmleci serbest bırak", tone: "hint" }],
@@ -537,7 +543,7 @@ export function startExperience(
     else if (event.code === "KeyK") controlsHud.toggle();
     else if (event.code === "KeyP") soundtrack.togglePanel();
     else if (event.code === "KeyM") minimap.toggle();
-    else if (event.code === "KeyG") graphicsSettings.toggle();
+    else if (event.code === "F2") graphicsSettings.toggle();
     else if (event.code === "KeyT") captureControls.takeScreenshot();
   };
 

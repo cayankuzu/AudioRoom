@@ -2,7 +2,7 @@ export interface HudOptions {
   title?: string;
   showLibraryBack?: boolean;
   libraryHref?: string;
-  sections: readonly HudRow[][];
+  sections: readonly (readonly HudRow[])[];
 }
 
 export interface HudRow {

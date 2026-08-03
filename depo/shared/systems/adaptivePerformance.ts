@@ -3,20 +3,17 @@ import * as THREE from "three";
 export type GraphicsMode = "auto" | "low" | "medium" | "high" | "ultra";
 export type GraphicsTier = Exclude<GraphicsMode, "auto">;
 
-export interface GraphicsProfile {
+export interface AdaptiveGraphicsProfile {
   tier: GraphicsTier;
   label: string;
   minPixelRatio: number;
   maxPixelRatio: number;
   initialPixelRatio: number;
-  shadows: boolean;
-  shadowMapSize: number;
-  tunnelDetail: number;
-  particleBudget: number;
-  activeProjectileBudget: number;
+  detailScale: number;
+  secondaryUpdateStride: number;
 }
 
-export interface PerformanceSnapshot {
+export interface AdaptivePerformanceSnapshot {
   mode: GraphicsMode;
   tier: GraphicsTier;
   fps: number;
@@ -26,31 +23,40 @@ export interface PerformanceSnapshot {
   triangles: number;
 }
 
-export interface PerformanceManager {
-  readonly profile: GraphicsProfile;
+export interface AdaptivePerformanceManager {
+  readonly profile: AdaptiveGraphicsProfile;
   readonly mode: GraphicsMode;
   sample(deltaSeconds: number): void;
   resize(width: number, height: number): void;
   setMode(mode: GraphicsMode): void;
-  onChange(callback: (profile: GraphicsProfile, snapshot: PerformanceSnapshot) => void): () => void;
-  snapshot(): PerformanceSnapshot;
+  onChange(
+    callback: (
+      profile: AdaptiveGraphicsProfile,
+      snapshot: AdaptivePerformanceSnapshot,
+    ) => void,
+  ): () => void;
+  snapshot(): AdaptivePerformanceSnapshot;
   dispose(): void;
 }
 
-const STORAGE_KEY = "klostrofobik-graphics-mode-v3";
+interface AdaptivePerformanceOptions {
+  storageKey: string;
+  onResolutionChange?: (
+    width: number,
+    height: number,
+    pixelRatio: number,
+  ) => void;
+}
 
-const PROFILES: Record<GraphicsTier, GraphicsProfile> = {
+const PROFILES: Record<GraphicsTier, AdaptiveGraphicsProfile> = {
   low: {
     tier: "low",
     label: "Düşük",
     minPixelRatio: 0.5,
     maxPixelRatio: 0.72,
     initialPixelRatio: 0.68,
-    shadows: false,
-    shadowMapSize: 512,
-    tunnelDetail: 0.5,
-    particleBudget: 24,
-    activeProjectileBudget: 20,
+    detailScale: 0.52,
+    secondaryUpdateStride: 3,
   },
   medium: {
     tier: "medium",
@@ -58,39 +64,35 @@ const PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     minPixelRatio: 0.62,
     maxPixelRatio: 0.95,
     initialPixelRatio: 0.88,
-    shadows: true,
-    shadowMapSize: 768,
-    tunnelDetail: 0.68,
-    particleBudget: 36,
-    activeProjectileBudget: 30,
+    detailScale: 0.7,
+    secondaryUpdateStride: 2,
   },
   high: {
     tier: "high",
     label: "Yüksek",
-    minPixelRatio: 0.74,
-    maxPixelRatio: 1.2,
+    minPixelRatio: 0.76,
+    maxPixelRatio: 1.25,
     initialPixelRatio: 1.08,
-    shadows: true,
-    shadowMapSize: 1024,
-    tunnelDetail: 0.84,
-    particleBudget: 50,
-    activeProjectileBudget: 40,
+    detailScale: 0.86,
+    secondaryUpdateStride: 1,
   },
   ultra: {
     tier: "ultra",
     label: "Ultra",
     minPixelRatio: 0.9,
-    maxPixelRatio: 1.5,
-    initialPixelRatio: 1.35,
-    shadows: true,
-    shadowMapSize: 1536,
-    tunnelDetail: 1,
-    particleBudget: 64,
-    activeProjectileBudget: 48,
+    maxPixelRatio: 1.75,
+    initialPixelRatio: 1.45,
+    detailScale: 1,
+    secondaryUpdateStride: 1,
   },
 };
 
-function readHardwareNumber(name: "deviceMemory" | "hardwareConcurrency", fallback: number): number {
+const TIER_ORDER: readonly GraphicsTier[] = ["low", "medium", "high", "ultra"];
+
+function readHardwareNumber(
+  name: "deviceMemory" | "hardwareConcurrency",
+  fallback: number,
+): number {
   const value = (navigator as Navigator & { deviceMemory?: number })[name];
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -100,7 +102,8 @@ function readGpuScoreAdjustment(): number {
   const context =
     canvas.getContext("webgl2", { powerPreference: "high-performance" }) ||
     canvas.getContext("webgl", { powerPreference: "high-performance" });
-  if (!context) return -4;
+  if (!context) return -5;
+
   const debugInfo = context.getExtension("WEBGL_debug_renderer_info") as {
     UNMASKED_RENDERER_WEBGL: number;
   } | null;
@@ -110,62 +113,42 @@ function readGpuScoreAdjustment(): number {
   const maxTextureSize = Number(context.getParameter(context.MAX_TEXTURE_SIZE));
   context.getExtension("WEBGL_lose_context")?.loseContext();
 
-  if (/swiftshader|llvmpipe|software|microsoft basic/.test(rendererName)) return -4;
+  if (/swiftshader|llvmpipe|software|microsoft basic/.test(rendererName)) return -5;
   if (/intel.*(hd graphics [2345]|gma)|mali-[34]|adreno \(tm\) [345]|powervr sgx/.test(rendererName)) {
     return -3;
   }
   if (/intel.*uhd/.test(rendererName)) return -1;
   if (maxTextureSize < 8192) return -2;
-  if (/rtx|radeon rx 6|radeon rx 7|apple m[234]|arc a[57]/.test(rendererName)) return 2;
+  if (/rtx|radeon rx 6|radeon rx 7|apple m[234]|arc a[57]/.test(rendererName)) return 3;
   if (/gtx|radeon rx|apple m1|apple m2|iris xe|vega/.test(rendererName)) return 1;
   return 0;
 }
 
-export function isBlockedMobileDevice(): boolean {
-  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
-  );
-  const userAgentDataMobile = Boolean(
-    (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile,
-  );
-  const coarseTouch =
-    navigator.maxTouchPoints > 0 &&
-    window.matchMedia?.("(pointer: coarse)").matches &&
-    Math.min(window.screen.width, window.screen.height) < 1100;
-  return uaMobile || userAgentDataMobile || coarseTouch;
-}
-
-export function getStoredGraphicsMode(): GraphicsMode {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === "low" || saved === "medium" || saved === "high" || saved === "ultra") {
-      return saved;
-    }
-    if (saved === "performance") return "low";
-    if (saved === "balanced") return "medium";
-    if (saved === "quality") return "high";
-  } catch {
-    // Depolama kapalıysa otomatik profil güvenli varsayılandır.
-  }
-  return "auto";
-}
-
-export function detectAutomaticTier(): GraphicsTier {
+export function detectAutomaticGraphicsTier(): GraphicsTier {
   const memory = readHardwareNumber("deviceMemory", 4);
   const cores = readHardwareNumber("hardwareConcurrency", 4);
-  const screenPixels = window.innerWidth * window.innerHeight * Math.min(window.devicePixelRatio, 2) ** 2;
+  const screenPixels =
+    window.innerWidth *
+    window.innerHeight *
+    Math.min(window.devicePixelRatio || 1, 2) ** 2;
   const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const saveData = Boolean(
+    (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
+  );
 
   let score = 0;
-  if (memory >= 8) score += 2;
+  if (memory >= 12) score += 3;
+  else if (memory >= 8) score += 2;
   else if (memory >= 4) score += 1;
-  else score -= 2;
-  if (cores >= 8) score += 2;
+  else score -= 3;
+  if (cores >= 12) score += 3;
+  else if (cores >= 8) score += 2;
   else if (cores >= 4) score += 1;
-  else score -= 2;
-  if (screenPixels > 5_000_000) score -= 2;
-  else if (screenPixels > 3_000_000) score -= 1;
+  else score -= 3;
+  if (screenPixels > 7_000_000) score -= 2;
+  else if (screenPixels > 4_000_000) score -= 1;
   if (reducedMotion) score -= 1;
+  if (saveData) score -= 2;
   score += readGpuScoreAdjustment();
 
   if (score >= 7) return "ultra";
@@ -174,43 +157,72 @@ export function detectAutomaticTier(): GraphicsTier {
   return "low";
 }
 
-export function getInitialGraphicsProfile(mode = getStoredGraphicsMode()): GraphicsProfile {
-  return PROFILES[mode === "auto" ? detectAutomaticTier() : mode];
+export function readGraphicsMode(storageKey: string): GraphicsMode {
+  try {
+    const saved = window.localStorage.getItem(storageKey);
+    if (
+      saved === "low" ||
+      saved === "medium" ||
+      saved === "high" ||
+      saved === "ultra"
+    ) {
+      return saved;
+    }
+  } catch {
+    // Depolama kapalıysa güvenli varsayılan otomatik profildir.
+  }
+  return "auto";
+}
+
+export function getAdaptiveGraphicsProfile(
+  mode: GraphicsMode,
+): AdaptiveGraphicsProfile {
+  return PROFILES[mode === "auto" ? detectAutomaticGraphicsTier() : mode];
 }
 
 function adjacentTier(tier: GraphicsTier, direction: -1 | 1): GraphicsTier {
-  const order: GraphicsTier[] = ["low", "medium", "high", "ultra"];
-  const index = THREE.MathUtils.clamp(order.indexOf(tier) + direction, 0, order.length - 1);
-  return order[index];
+  const index = THREE.MathUtils.clamp(
+    TIER_ORDER.indexOf(tier) + direction,
+    0,
+    TIER_ORDER.length - 1,
+  );
+  return TIER_ORDER[index];
 }
 
-export function createPerformanceManager(
+export function createAdaptivePerformanceManager(
   renderer: THREE.WebGLRenderer,
-  initialMode = getStoredGraphicsMode(),
-): PerformanceManager {
-  let mode = initialMode;
-  let profile = getInitialGraphicsProfile(mode);
+  options: AdaptivePerformanceOptions,
+): AdaptivePerformanceManager {
+  let mode = readGraphicsMode(options.storageKey);
+  let profile = getAdaptiveGraphicsProfile(mode);
   let pixelRatio = THREE.MathUtils.clamp(
-    Math.min(window.devicePixelRatio, profile.initialPixelRatio),
+    Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio),
     profile.minPixelRatio,
     profile.maxPixelRatio,
   );
-  let width = window.innerWidth;
-  let height = window.innerHeight;
+  let width = Math.max(1, window.innerWidth);
+  let height = Math.max(1, window.innerHeight);
   let elapsed = 0;
   let frames = 0;
   let fps = 60;
   let smoothedFrameMs = 16.67;
   let slowSeconds = 0;
+  let stableSeconds = 0;
   let adjustmentCooldown = 0;
-  const listeners = new Set<(profile: GraphicsProfile, snapshot: PerformanceSnapshot) => void>();
+  let disposed = false;
+  const listeners = new Set<(
+    profile: AdaptiveGraphicsProfile,
+    snapshot: AdaptivePerformanceSnapshot,
+  ) => void>();
 
   const applySize = () => {
+    if (disposed) return;
     renderer.setPixelRatio(pixelRatio);
     renderer.setSize(width, height, false);
+    options.onResolutionChange?.(width, height, pixelRatio);
   };
 
-  const snapshot = (): PerformanceSnapshot => ({
+  const snapshot = (): AdaptivePerformanceSnapshot => ({
     mode,
     tier: profile.tier,
     fps: Math.round(fps),
@@ -225,12 +237,16 @@ export function createPerformanceManager(
     listeners.forEach((listener) => listener(profile, state));
   };
 
-  const applyProfile = (nextTier: GraphicsTier, resetResolution: boolean) => {
-    profile = PROFILES[nextTier];
+  const applyProfile = (tier: GraphicsTier, resetResolution: boolean) => {
+    profile = PROFILES[tier];
     if (resetResolution) {
-      pixelRatio = Math.min(window.devicePixelRatio, profile.initialPixelRatio);
+      pixelRatio = Math.min(window.devicePixelRatio || 1, profile.initialPixelRatio);
     }
-    pixelRatio = THREE.MathUtils.clamp(pixelRatio, profile.minPixelRatio, profile.maxPixelRatio);
+    pixelRatio = THREE.MathUtils.clamp(
+      pixelRatio,
+      profile.minPixelRatio,
+      profile.maxPixelRatio,
+    );
     applySize();
     notify();
   };
@@ -245,8 +261,10 @@ export function createPerformanceManager(
       return mode;
     },
     sample(deltaSeconds) {
+      if (disposed || document.visibilityState === "hidden") return;
       const safeDelta = Math.min(Math.max(deltaSeconds, 0), 0.25);
       if (safeDelta <= 0) return;
+
       const frameMs = safeDelta * 1000;
       smoothedFrameMs += (frameMs - smoothedFrameMs) * 0.055;
       elapsed += safeDelta;
@@ -264,8 +282,14 @@ export function createPerformanceManager(
         return;
       }
 
-      const struggling = fps < 54 || smoothedFrameMs > 18.5;
-      slowSeconds = struggling ? slowSeconds + sampleWindow : Math.max(0, slowSeconds - sampleWindow * 0.7);
+      const struggling = fps < 54 || smoothedFrameMs > 18.7;
+      const stable = fps >= 58 && smoothedFrameMs <= 17.4;
+      slowSeconds = struggling
+        ? slowSeconds + sampleWindow
+        : Math.max(0, slowSeconds - sampleWindow * 0.75);
+      stableSeconds = stable
+        ? stableSeconds + sampleWindow
+        : Math.max(0, stableSeconds - sampleWindow);
 
       if (adjustmentCooldown <= 0 && slowSeconds >= 2) {
         if (pixelRatio > profile.minPixelRatio + 0.04) {
@@ -277,10 +301,22 @@ export function createPerformanceManager(
         }
         adjustmentCooldown = 2.5;
         slowSeconds = 0;
-        notify();
-      } else {
-        notify();
+        stableSeconds = 0;
+      } else if (
+        adjustmentCooldown <= 0 &&
+        stableSeconds >= 9 &&
+        pixelRatio < Math.min(window.devicePixelRatio || 1, profile.maxPixelRatio) - 0.04
+      ) {
+        pixelRatio = Math.min(
+          window.devicePixelRatio || 1,
+          profile.maxPixelRatio,
+          pixelRatio + 0.08,
+        );
+        applySize();
+        adjustmentCooldown = 4;
+        stableSeconds = 0;
       }
+      notify();
     },
     resize(nextWidth, nextHeight) {
       width = Math.max(1, Math.floor(nextWidth));
@@ -290,14 +326,18 @@ export function createPerformanceManager(
     setMode(nextMode) {
       mode = nextMode;
       try {
-        if (mode === "auto") window.localStorage.removeItem(STORAGE_KEY);
-        else window.localStorage.setItem(STORAGE_KEY, mode);
+        if (mode === "auto") window.localStorage.removeItem(options.storageKey);
+        else window.localStorage.setItem(options.storageKey, mode);
       } catch {
-        // Oyun depolama izni olmadan da çalışır.
+        // Ayar yine oturum boyunca uygulanır.
       }
       slowSeconds = 0;
+      stableSeconds = 0;
       adjustmentCooldown = 2;
-      applyProfile(mode === "auto" ? detectAutomaticTier() : mode, true);
+      applyProfile(
+        mode === "auto" ? detectAutomaticGraphicsTier() : mode,
+        true,
+      );
     },
     onChange(callback) {
       listeners.add(callback);
@@ -306,6 +346,7 @@ export function createPerformanceManager(
     },
     snapshot,
     dispose() {
+      disposed = true;
       listeners.clear();
     },
   };

@@ -36,6 +36,8 @@ import {
   requestFullscreen,
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
+import { createAdaptivePerformanceManager } from "../../../../shared/systems/adaptivePerformance";
+import { createGraphicsSettings } from "../../../../shared/ui/graphicsSettings";
 
 export interface ExperienceHandle {
   requestLock(): void;
@@ -68,6 +70,9 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   console.log("[Hayko BBS]", "Session seed:", sessionSeed);
 
   const renderer = createRenderer(container);
+  const performanceManager = createAdaptivePerformanceManager(renderer, {
+    storageKey: "audioroom-beni-buyuten-sarkilar-graphics-v1",
+  });
   const scene = createScene();
   const camera = createCamera();
   scene.add(camera);
@@ -80,6 +85,15 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const dome = createDome(scene);
   const floor = createFloor(scene);
   const particles = createParticles(scene);
+  let secondaryUpdateStride = performanceManager.profile.secondaryUpdateStride;
+  const graphicsSettings = createGraphicsSettings(
+    document.body,
+    performanceManager,
+    (profile) => {
+      secondaryUpdateStride = profile.secondaryUpdateStride;
+      particles.group.visible = profile.tier !== "low";
+    },
+  );
   const cells = createCells(scene);
   const footprints = createFootprints(scene);
   const center = createCenterPiece(scene);
@@ -316,21 +330,26 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     document.body.classList.toggle("is-fullscreen", isFullscreen());
   }
 
+  let optimizedNoticeShown = false;
   const offMobileLock = input.onLockChange((locked) => {
-    if (!input.isTouch) return;
-    mobileControls?.setVisible(locked);
+    if (input.isTouch) mobileControls?.setVisible(locked);
+    if (locked && !optimizedNoticeShown) {
+      optimizedNoticeShown = true;
+      graphicsSettings.showOptimizedNotice();
+    }
   });
 
   const onResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    performanceManager.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", onResize);
 
   /** ── RAF döngüsü ──────────────────────────────────────────────── */
   const clock = new THREE.Clock();
   let raf = 0;
+  let frameIndex = 0;
   const gramPos = new THREE.Vector3();
 
   function collectInteractables(): THREE.Object3D[] {
@@ -395,6 +414,8 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   const tick = () => {
     const delta = Math.min(clock.getDelta(), 0.05);
     const time = clock.elapsedTime;
+    frameIndex += 1;
+    performanceManager.sample(delta);
 
     floor.update(time);
     movement.update(
@@ -415,7 +436,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     );
     footprints.update(time, floor.getHeightAt);
 
-    particles.update(time, delta);
+    if (particles.group.visible) particles.update(time, delta);
     cells.update(time, delta, camera.position);
     worldLights.update(time);
     dome.update(time);
@@ -461,7 +482,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     const gain = audioDistance.update(delta, camera.position, gramPos);
     uiAlbum.setDistanceGain(gain);
 
-    if (uiMinimap) {
+    if (uiMinimap && frameIndex % secondaryUpdateStride === 0) {
       uiMinimap.update(
         movement.pose.position,
         movement.pose.yaw,
@@ -505,6 +526,8 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       minimap?.dispose();
       hint?.dispose();
       albumPanel?.dispose();
+      graphicsSettings.dispose();
+      performanceManager.dispose();
       scene.remove(particles.group);
       renderer.dispose();
       renderer.domElement.parentElement?.removeChild(renderer.domElement);

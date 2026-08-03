@@ -1,4 +1,5 @@
 import { renderLibrary } from "../features/library/renderLibrary";
+import { bindPagePerformance } from "./pagePerformance";
 
 declare global {
   interface Window {
@@ -9,5 +10,10 @@ declare global {
 export function bootstrapApp(root: HTMLElement): void {
   window.__audioroomCleanup?.();
   root.innerHTML = "";
-  window.__audioroomCleanup = renderLibrary(root);
+  const disposePerformance = bindPagePerformance();
+  const disposeLibrary = renderLibrary(root);
+  window.__audioroomCleanup = () => {
+    disposeLibrary();
+    disposePerformance();
+  };
 }
