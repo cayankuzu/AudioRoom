@@ -50,6 +50,7 @@ const DRAG_THRESHOLD = 8;
 const PROFILE_POPOVER_TIMEOUT_MS = 2200;
 const PORTRAIT_HINT_INTERVAL_MS = 6000;
 const PORTRAIT_HINT_VISIBLE_MS = 3000;
+const FEATURED_EXPERIENCE_ID = "mukemmel-bosluk";
 const RELEASE_TYPES: readonly LibraryReleaseType[] = ["album", "single", "ep"];
 const AVAILABILITY_OPTIONS: readonly LibraryAvailability[] = [
   "available",
@@ -566,7 +567,13 @@ export function renderLibraryHome(
     return link;
   });
 
-  let rotation = state.rotation;
+  const featuredExperienceIndex = experiences.findIndex(
+    (experience) => experience.id === FEATURED_EXPERIENCE_ID,
+  );
+  let rotation =
+    state.selectedId === null && featuredExperienceIndex >= 0
+      ? -(featuredExperienceIndex * (360 / experiences.length))
+      : state.rotation;
   let animationFrame = 0;
   let activePointerId: number | null = null;
   let isAutoSpinning = false;
