@@ -112,21 +112,23 @@ export const trLibraryLocale: LibraryLocaleBundle = {
       searchTerms: ["kuantum", "heisenberg", "ölçüm", "konum", "hız"],
     },
     "klostrofobik-kaplumbaga": {
-      worldLabel: "Yakında",
+      worldLabel: "Havuç Takibi",
       detailHeadline:
-        "Bu kayıt şu an kütüphanede arşiv olarak yer alıyor; evren deneyimi daha sonra açılacak.",
+        "Plağı kaçıran tavşanı havuçlarla önce yavaşlatın, sonra durdurun ve plağı elinden geri alın.",
       albumSummary:
-        "Henry the Lee'nin 2020 tarihli tek parça single kaydı; şu an arşiv ön izlemesi olarak listeleniyor.",
-      experienceSummary: "",
-      detailNarrative: "",
+        "Henry the Lee'nin 2020 tarihli tek parça single kaydı; kaplumbağa, kaçış ve sıkışmışlık imgelerini kendine özgü bir çizgi dünyasında buluşturuyor.",
+      experienceSummary:
+        "Sisli topografik arazide koşan tavşanı takip edin. İlk havuç onu yürüyüşe geçirir, ikinci havuç durdurur; yaklaşınca plak yeniden sizin olur.",
+      detailNarrative:
+        "Merkezde kaplumbağa ve albüm yazıları tek bir anıt gibi dönerken tavşan çevredeki düzensiz rotada plağı taşır. Hedefi okuyun, mesafeyi kapatın ve iki temiz isabet alın.",
       albumFacts: [
         "Yayımlanma tarihi: 13 Ağustos 2020",
         "Parça sayısı: 1",
         "Süre: 3:24",
         "Albüm tipi: Single",
-        "Durum: Arşiv ön izlemesi",
+        "Oyun döngüsü: Koş · yavaşlat · durdur · plağı al",
       ],
-      searchTerms: ["yakında", "single"],
+      searchTerms: ["kaplumbağa", "tavşan", "havuç", "plak", "takip", "single"],
     },
     "mukemmel-bosluk": {
       worldLabel: "Krater Oda",

@@ -26,6 +26,7 @@ export default defineConfig({
       "index.html",
       "depo/redd/mukemmel_bosluk/index.html",
       "depo/henry_the_lee/kuantum_dolanıklığı/index.html",
+      "depo/henry_the_lee/klostrofobik_kaplumbaga/index.html",
       "depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/index.html",
     ],
     exclude: ["three", "troika-three-text"],
@@ -56,6 +57,10 @@ export default defineConfig({
         kuantum_dolaniklik: resolve(
           __dirname,
           "depo/henry_the_lee/kuantum_dolanıklığı/index.html"
+        ),
+        klostrofobik_kaplumbaga: resolve(
+          __dirname,
+          "depo/henry_the_lee/klostrofobik_kaplumbaga/index.html"
         ),
         hayko_beni_buyuyen_v1: resolve(
           __dirname,

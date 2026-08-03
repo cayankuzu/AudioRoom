@@ -1,0 +1,100 @@
+/* Mükemmel Boşluk arayüzü; parlaklık paneli kaldırıldığı için yakalama araçları en üstte. */
+.capture-panel {
+  top: 1rem;
+}
+
+@media (max-width: 760px) {
+  .capture-panel {
+    top: 0.6rem;
+  }
+}
+
+body.is-overlay-open .hud,
+body.is-overlay-open .minimap,
+body.is-overlay-open .album-panel,
+body.is-overlay-open .capture-panel,
+body.is-overlay-open .brand-footer,
+body.is-overlay-open .game-ui {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.is-overlay-open .game-ui,
+body.is-overlay-open .brand-footer {
+  pointer-events: none;
+}
+
+/* Albüm oynatıcısı Mükemmel Boşluk düzenini korurken dar ekranlarda taşmasın. */
+.album-panel {
+  width: min(360px, calc(100vw - 2rem));
+  min-width: 0;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+}
+
+.album-panel__head,
+.album-panel__body,
+.album-panel__frame-wrap,
+.album-panel__progress,
+.album-panel__controls,
+.album-panel__tracks,
+.album-panel__list,
+.album-panel__track {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.album-panel__body,
+.album-panel__list {
+  overflow-x: hidden;
+}
+
+.album-panel__controls {
+  width: 100%;
+}
+
+.album-panel__volume {
+  flex: 1 1 64px;
+  min-width: 48px;
+}
+
+.album-panel__volume input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.album-panel__track.is-missing {
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 72px) 22px;
+}
+
+.album-panel__track-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .album-panel {
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .album-panel__controls {
+    gap: 0.22rem;
+  }
+
+  .album-panel__btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .album-panel__btn--primary {
+    width: 36px;
+    height: 36px;
+  }
+}

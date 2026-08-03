@@ -94,8 +94,9 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
     album: "Klostrofobik Kaplumbağa",
     year: "2020",
     cover: "./covers/klostrofobik-kaplumbaga.jpg",
+    path: "./depo/henry_the_lee/klostrofobik_kaplumbaga/",
     releaseType: "single",
-    availability: "soon",
+    availability: "available",
     theme: {
       accent: "#d6b36d",
       aura: "rgba(214, 179, 109, 0.34)",
@@ -104,6 +105,10 @@ export const LIBRARY_ENTRY_METADATA: readonly LibraryEntryMetadata[] = [
       foil: "rgba(181, 120, 72, 0.22)",
     },
     trackTitles: KLOSTROFOBIK_TRACK_TITLES,
+    directTrackUrls: {
+      "Klostrofobik Kaplumbağa":
+        "https://www.youtube.com/watch?v=NT6uepCbmEo&list=RDNT6uepCbmEo&start_radio=1",
+    },
   },
   {
     id: "mukemmel-bosluk",
