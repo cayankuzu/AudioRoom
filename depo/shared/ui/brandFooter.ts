@@ -2,14 +2,21 @@ export interface BrandFooter {
   dispose(): void;
 }
 
-export function createBrandFooter(parent: HTMLElement): BrandFooter {
+export function createBrandFooter(
+  parent: HTMLElement,
+  version?: string,
+): BrandFooter {
   const element = document.createElement("div");
   element.className = "brand-footer";
   element.setAttribute("aria-hidden", "true");
+  if (version) element.dataset.version = version;
   element.innerHTML = `
     <span class="brand-footer__copy">© 2026</span>
     <span class="brand-footer__sep" aria-hidden="true">·</span>
     <span class="brand-footer__by">Powered by <strong>MeMoDe</strong></span>
+    ${version
+      ? `<span class="brand-footer__sep" aria-hidden="true">·</span><span class="brand-footer__version">${version}</span>`
+      : ""}
   `;
 
   parent.appendChild(element);

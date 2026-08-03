@@ -316,6 +316,11 @@
   color: var(--shell-accent);
 }
 
+.brand-footer__version {
+  color: var(--shell-text);
+  letter-spacing: 0.1em;
+}
+
 .mobile-controls {
   position: absolute;
   inset: 0;

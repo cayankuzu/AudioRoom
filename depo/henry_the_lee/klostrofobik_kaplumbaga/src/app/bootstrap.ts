@@ -10,6 +10,8 @@ import {
   tryHideMobileAddressBar,
 } from "../utils/fullscreen";
 
+const APP_VERSION = "v1.1.0";
+
 declare global {
   interface Window {
     __audioroomCleanup?: () => void;
@@ -24,7 +26,7 @@ export function bootstrapApp(root: HTMLElement): void {
   container.id = "experience";
   root.appendChild(container);
 
-  const footer = createBrandFooter(document.body);
+  const footer = createBrandFooter(document.body, APP_VERSION);
   const loading = createLoadingOverlay(document.body);
   const experience = startExperience(container, {
     onProgress: (value, detail) => loading.setProgress(value, detail),
