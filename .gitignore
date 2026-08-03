@@ -8,5 +8,6 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .vercel
+.env*
 /**/meshy_bee.glb
 /**/meshy_daisy.glb
