@@ -19,7 +19,18 @@ export function createRenderer(container: HTMLElement): THREE.WebGLRenderer {
   });
   /** İlk kare güvenli DPR ile açılır; ortak performans yöneticisi cihazı ölçüp yükseltir. */
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  /**
+   * `updateStyle=false` — CSS (`#experience canvas { width:100%; height:100%; }`)
+   * canvas'ın GÖRÜNEN kutu boyutunu yönetsin. Varsayılan `true` ile
+   * çağrılırsa Three.js `canvas.style.width/height`'ı SABİT piksel
+   * değerine yazar (örn. ilk yüklemedeki dar viewport'a göre); sonraki
+   * tüm `setSize` çağrıları (adaptivePerformance.ts) zaten `false`
+   * geçiyor, ama bu ilk çağrı `true` kalırsa o sabit satır-içi stil hiç
+   * silinmiyor — kullanıcı daha sonra tam ekrana geçtiğinde veya
+   * döndürdüğünde canvas eski küçük boyutunda kilitli kalıp ekranın
+   * geri kalanında ölü siyah alan bırakıyordu.
+   */
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = BRIGHTNESS.default;

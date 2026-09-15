@@ -11,7 +11,14 @@ export function createRenderer(container: HTMLElement): THREE.WebGLRenderer {
     stencil: false,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  /**
+   * `updateStyle=false` — canvas'ın görünen kutu boyutunu CSS yönetsin.
+   * Varsayılan `true` ile sabit piksel `style.width/height` yazılırdı ve
+   * sonraki resize'lar (updateStyle=false) o satır-içi stili hiç
+   * silmediği için fullscreen/döndürme sonrası canvas eski boyutunda
+   * kilitli kalıp ekranda ölü siyah alan bırakıyordu.
+   */
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;

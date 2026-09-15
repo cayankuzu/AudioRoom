@@ -87,6 +87,16 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       post.resize(width, height, pixelRatio);
     },
   });
+  /**
+   * F2 ile grafik panelini açmak oyunu DURDURMAMALI — yalnızca imleci
+   * geçici olarak serbest bırakmalı ki kullanıcı panel butonlarına
+   * tıklayabilsin. Bu yüzden `input`in pointer-lock kaybını dış dünyaya
+   * (experienceGate → pause overlay) bildiren `onLockChange` zincirini bu
+   * bayrakla filtreliyoruz: panel açıkken oluşan "unlock" bir gerçek pause
+   * DEĞİL, sadece UI için ödünç alınmış imleç anlamına gelir.
+   */
+  let pointerFreedForSettings = false;
+
   const graphicsSettings = createGraphicsSettings(
     document.body,
     performanceManager,
@@ -102,13 +112,16 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       post.grading.grainStrength.value =
         profile.tier === "low" ? 0 : profile.tier === "medium" ? 0.004 : 0.01;
     },
-    /**
-     * Panel F2 ile açılınca oyunu kanıtlanmış pause yoluyla durdur (Pause
-     * butonuyla birebir aynı çağrı) — yalnızca `document.exitPointerLock()`
-     * bazı durumlarda imleci güvenilir şekilde serbest bırakmıyordu.
-     */
     (open) => {
-      if (open) input.releaseLock();
+      if (open) {
+        if (input.isLocked() && !input.isTouch) {
+          pointerFreedForSettings = true;
+          document.exitPointerLock();
+        }
+      } else if (pointerFreedForSettings) {
+        pointerFreedForSettings = false;
+        input.requestLock();
+      }
     },
   );
 
@@ -744,7 +757,15 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   return {
     requestLock: requestExperienceLock,
     releaseLock: () => input.releaseLock(),
-    onLockChange: (cb) => input.onLockChange(cb),
+    onLockChange: (cb) =>
+      input.onLockChange((nextLocked) => {
+        /**
+         * F2 panelinin kendi imleç-serbest-bırakma unlock'unu pause
+         * overlay'e bildirme — bu gerçek bir pause değil.
+         */
+        if (!nextLocked && pointerFreedForSettings) return;
+        cb(nextLocked);
+      }),
     dispose() {
       cancelAnimationFrame(raf);
       offMobileLock();
