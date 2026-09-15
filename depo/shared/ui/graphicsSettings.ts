@@ -86,6 +86,16 @@ export function createGraphicsSettings(
     panel.classList.toggle("is-open", open);
     launcher.classList.toggle("is-active", open);
     launcher.setAttribute("aria-expanded", String(open));
+    /**
+     * Masaüstünde oyun sırasında imleç pointer-lock ile gizli/kilitli olur
+     * (FPS bakış kontrolü). Paneli F2 ile açarken kilidi bırakmazsak fare
+     * hareket etmiyormuş gibi görünür ve kullanıcı hiçbir butona
+     * tıklayamaz. Panel her açıldığında kilidi bırak ki imleç normal
+     * şekilde görünüp hareket etsin.
+     */
+    if (open && document.pointerLockElement) {
+      document.exitPointerLock();
+    }
   };
 
   const render = (
@@ -128,7 +138,7 @@ export function createGraphicsSettings(
       notice.classList.add("is-visible");
       noticeTimer = window.setTimeout(
         () => notice.classList.remove("is-visible"),
-        7200,
+        14000,
       );
     },
     toggle() {

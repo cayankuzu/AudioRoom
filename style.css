@@ -2392,6 +2392,8 @@ a {
   display: flex;
   justify-content: center;
   padding-top: 1rem;
+  /** Clear the fixed .library-footer bar pinned to the viewport bottom. */
+  padding-bottom: calc(2.6rem + env(safe-area-inset-bottom));
 }
 
 .orbit-randomize {

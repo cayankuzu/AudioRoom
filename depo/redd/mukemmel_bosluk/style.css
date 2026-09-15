@@ -2468,9 +2468,9 @@ body.is-touch .interaction-hint {
   text-align: center;
 }
 
-/* Brand footer — mobilde de görünür. Sadece oyun aktifken (d-pad/aksiyon
- * alt köşeleri dolduruyor) gizlenir; kütüphane + start-overlay'de görünür.
- * Mobilde daha kompakt stille.
+/* Brand footer — mobilde her zaman görünür (kütüphane, start-overlay ve
+ * oyun içinde). `pointer-events: none` olduğu için d-pad/toolbar'ı asla
+ * engellemez. Mobilde daha kompakt stille.
  */
 body.is-touch .brand-footer {
   font-size: 0.56rem;
@@ -2482,14 +2482,6 @@ body.is-touch .brand-footer {
 
 body.is-touch .brand-footer__by strong {
   letter-spacing: 0.06em;
-}
-
-/** Oyun içinde (experience mount edildi ve overlay kapalı) → gizle. Bu
- *  durum hem d-pad'i hem toolbar'ı engellememek için güvenli.
- *  Overlay aktifken (start-overlay veya pause overlay) brand footer
- *  görünür kalsın. */
-body.is-touch.is-in-experience:not(.is-overlay-open) .brand-footer {
-  display: none !important;
 }
 
 /* Start overlay — mobilde kart kompakt */

@@ -1,7 +1,7 @@
 import { getLibraryLocale } from "../../i18n";
 
 const libraryLocale = getLibraryLocale();
-const HUB_VERSION = "v2.5.2";
+const HUB_VERSION = "v2.5.3";
 
 export function renderLibraryFooter(): string {
   const year = new Date().getFullYear();

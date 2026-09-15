@@ -349,6 +349,18 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       mobileControls?.setFullscreenActive(active);
       document.body.classList.toggle("is-fullscreen", active);
       tryHideMobileAddressBar();
+      /**
+       * Mobil tarayıcılarda fullscreen geçişi her zaman bir `resize`
+       * event'i tetiklemez (özellikle Android Chrome/WebView), bu yüzden
+       * renderer/composer eski boyutta kalıp ekranın altında/sağında boşluk
+       * bırakıyordu. Geçiş sonrası boyutu elle senkronize et — bir kere
+       * hemen, bir kere de tarayıcı viewport'u oturttuktan sonra (rAF +
+       * kısa gecikme) tekrar, çünkü bazı cihazlarda innerWidth/innerHeight
+       * geçiş anında henüz güncellenmemiş oluyor.
+       */
+      resize();
+      requestAnimationFrame(resize);
+      window.setTimeout(resize, 300);
     });
     /** İlk durum senkronizasyonu. */
     mobileControls?.setFullscreenActive(isFullscreen());
@@ -563,6 +575,13 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
     performanceManager.resize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", resize);
+  /**
+   * `visualViewport` boyut değişikliklerini `window.resize`'dan daha
+   * güvenilir yakalar — fullscreen giriş/çıkışı, adres çubuğu gizle/göster
+   * ve klavye açılması gibi mobil geçişlerde `resize` event'i hiç
+   * tetiklenmeyebiliyor.
+   */
+  window.visualViewport?.addEventListener("resize", resize);
 
   const clock = new THREE.Clock();
   const gramPos = new THREE.Vector3();
@@ -703,6 +722,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       offMobileLock();
       unwatchFullscreen?.();
       window.removeEventListener("resize", resize);
+      window.visualViewport?.removeEventListener("resize", resize);
       window.removeEventListener("orientationchange", tryHideMobileAddressBar);
       document.removeEventListener("keydown", onKeyDown);
       mobileControls?.dispose();
