@@ -3773,11 +3773,17 @@ html[data-page-graphics-tier="medium"] .library-orbit__halo {
   min-width: 0;
 }
 
-.orbit-album-card__artist,
 .orbit-album-card__title,
 .orbit-album-card__meta {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.orbit-album-card__artist {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 640px) {
@@ -3854,10 +3860,9 @@ html[data-page-graphics-tier="medium"] .library-orbit__halo {
   }
 
   .orbit-album-card__artist {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .orbit-album-card__title {
