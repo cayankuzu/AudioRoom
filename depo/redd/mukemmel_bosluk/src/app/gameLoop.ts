@@ -102,6 +102,14 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       post.grading.grainStrength.value =
         profile.tier === "low" ? 0 : profile.tier === "medium" ? 0.004 : 0.01;
     },
+    /**
+     * Panel F2 ile açılınca oyunu kanıtlanmış pause yoluyla durdur (Pause
+     * butonuyla birebir aynı çağrı) — yalnızca `document.exitPointerLock()`
+     * bazı durumlarda imleci güvenilir şekilde serbest bırakmıyordu.
+     */
+    (open) => {
+      if (open) input.releaseLock();
+    },
   );
 
   const terrain = createTerrain();
@@ -570,9 +578,19 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
   });
 
   const resize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    /**
+     * `window.innerWidth/innerHeight` mobil tarayıcılarda fullscreen
+     * geçişi sırasında bir süre eski değeri döndürebiliyor (özellikle
+     * Android Chrome/WebView) ve bu da canvas'ın altında/sağında ölü
+     * siyah alan bırakıyordu. `container` gerçek DOM elemanı olduğu için
+     * `clientWidth/clientHeight` her zaman güncel, layout'u zorlanmış
+     * gerçek boyutu verir.
+     */
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    performanceManager.resize(window.innerWidth, window.innerHeight);
+    performanceManager.resize(width, height);
   };
   window.addEventListener("resize", resize);
   /**
@@ -582,6 +600,16 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
    * tetiklenmeyebiliyor.
    */
   window.visualViewport?.addEventListener("resize", resize);
+  /**
+   * En güvenilir sinyal: `container`'ın gerçek boyutu her değiştiğinde
+   * (fullscreen, adres çubuğu, döndürme, klavye — nedeni ne olursa olsun)
+   * tetiklenir. `window resize`/`visualViewport resize` bazı tarayıcılarda
+   * fullscreen geçişinde hiç ateşlenmeyebiliyor; ResizeObserver DOM
+   * elemanının kendi layout kutusunu izlediği için bu boşluğu kapatır.
+   */
+  const resizeObserver =
+    typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
+  resizeObserver?.observe(container);
 
   const clock = new THREE.Clock();
   const gramPos = new THREE.Vector3();
@@ -723,6 +751,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
       unwatchFullscreen?.();
       window.removeEventListener("resize", resize);
       window.visualViewport?.removeEventListener("resize", resize);
+      resizeObserver?.disconnect();
       window.removeEventListener("orientationchange", tryHideMobileAddressBar);
       document.removeEventListener("keydown", onKeyDown);
       mobileControls?.dispose();

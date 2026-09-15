@@ -28,6 +28,15 @@ export function createGraphicsSettings(
   parent: HTMLElement,
   manager: AdaptivePerformanceManager,
   onProfileChange?: (profile: AdaptiveGraphicsProfile) => void,
+  /**
+   * Panel her açılıp kapandığında çağrılır. Çağıran taraf bunu genelde
+   * oyunun kendi kilit/pause mekanizmasına (`input.releaseLock()`) bağlar
+   * — `document.exitPointerLock()` tek başına bazı tarayıcı/klavye
+   * kombinasyonlarında güvenilir tetiklenmeyebiliyor; oyunun KENDİ
+   * kanıtlanmış pause yoluyla (Pause butonuyla aynı) çağrılması daha
+   * sağlam.
+   */
+  onOpenChange?: (open: boolean) => void,
 ): GraphicsSettingsHandle {
   const launcher = document.createElement("button");
   launcher.className = "adaptive-graphics-launcher";
@@ -96,6 +105,7 @@ export function createGraphicsSettings(
     if (open && document.pointerLockElement) {
       document.exitPointerLock();
     }
+    onOpenChange?.(open);
   };
 
   const render = (
