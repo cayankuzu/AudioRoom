@@ -1022,3 +1022,62 @@ body.is-ui-hidden .mobile-controls__toolbar > .mobile-controls__tool:not(.mobile
     font-size: 0.74rem;
   }
 }
+
+/**
+ * Touch layout: the mobile controls toolbar (back/eye/flashlight/map/
+ * panel/fullscreen/pause) is centered at the top of the screen. The
+ * graphics launcher pill used to also be centered at the top, so on
+ * any touch device — including landscape phones, which are wider than
+ * the old 640px breakpoint below — the two pills landed exactly on top
+ * of each other and tore the toolbar apart visually. Move the launcher
+ * (and the panel/notice anchored to it) to a top-right icon button so
+ * it never shares the toolbar's horizontal band.
+ */
+body.is-touch .adaptive-graphics-launcher {
+  top: max(0.5rem, env(safe-area-inset-top));
+  left: auto;
+  right: max(0.5rem, env(safe-area-inset-right));
+  transform: none;
+  width: var(--shell-toolbar-size);
+  height: var(--shell-toolbar-size);
+  min-height: 0;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  z-index: 90;
+}
+
+body.is-touch .adaptive-graphics-launcher strong {
+  display: none;
+}
+
+body.is-touch .adaptive-graphics-launcher span {
+  font-size: 1rem;
+}
+
+body.is-touch .adaptive-graphics {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + var(--shell-toolbar-size) + 0.5rem);
+  left: auto;
+  right: max(0.5rem, env(safe-area-inset-right));
+  transform: translateY(-10px) scale(0.985);
+  width: min(300px, calc(100vw - 1rem));
+  max-height: calc(100dvh - max(0.5rem, env(safe-area-inset-top)) - var(--shell-toolbar-size) - 1.5rem);
+  overflow-y: auto;
+}
+
+body.is-touch .adaptive-graphics.is-open {
+  transform: translateY(0) scale(1);
+}
+
+body.is-touch .adaptive-graphics__modes {
+  grid-template-columns: 1fr;
+}
+
+body.is-touch .adaptive-graphics__modes button:first-child {
+  grid-column: auto;
+}
+
+body.is-touch .adaptive-graphics-notice {
+  top: calc(max(0.5rem, env(safe-area-inset-top)) + var(--shell-toolbar-size) + 0.5rem);
+  width: min(calc(100vw - 1rem), 460px);
+}
