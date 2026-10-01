@@ -36,6 +36,8 @@ import { createGraphicsSettings } from "../../../../shared/ui/graphicsSettings";
 
 export interface ExperienceHandle {
   requestLock(): void;
+  /** Fare kilidi alınamazsa sürükle-bak ile başlat. */
+  forceStart?(): void;
   releaseLock(): void;
   onLockChange(cb: (locked: boolean) => void): () => void;
   /**
@@ -507,6 +509,7 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
 
   return {
     requestLock: () => input.requestLock(),
+    forceStart: () => input.forceStart(),
     releaseLock: () => input.releaseLock(),
     onLockChange: (cb) => input.onLockChange(cb),
     attachUi,

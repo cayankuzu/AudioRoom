@@ -1,7 +1,4 @@
-import { bootstrapApp } from "./app/bootstrap";
+import "./hub/hub.css";
+import { bootHub } from "./hub/app";
 
-const root = document.querySelector<HTMLDivElement>("#app");
-
-if (root) {
-  bootstrapApp(root);
-}
+bootHub(document.getElementById("app") ?? document.body);

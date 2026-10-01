@@ -5,6 +5,8 @@ export interface InputHandle {
   readonly isTouch: boolean;
   isLocked(): boolean;
   requestLock(): void;
+  /** Fare kilidi alınamazsa (tarayıcı reddetti, Esc sonrası bekleme, iframe) oyunu yine de başlatır: sürükle-bak. */
+  forceStart(): void;
   releaseLock(): void;
   onLockChange(cb: (locked: boolean) => void): () => void;
   consumeLook(): { x: number; y: number };
@@ -19,6 +21,8 @@ export function createInput(target: HTMLElement): InputHandle {
   const listeners = new Set<(locked: boolean) => void>();
   const isTouch = readInputDeviceProfile().usesTouchUi;
   let locked = false;
+  /** Sanal kilit: gerçek fare kilidi yokken oyun sürer; bakış sol tuş basılıyken sürüklenerek döner. */
+  let virtual = false;
 
   const emitLock = (next: boolean) => {
     if (locked === next) return;
@@ -32,17 +36,47 @@ export function createInput(target: HTMLElement): InputHandle {
   const onBlur = () => pressed.clear();
   const onMouseMove = (event: MouseEvent) => {
     if (!locked || isTouch) return;
+    if (virtual && !(event.buttons & 1)) return;
     look.x -= event.movementX * 0.00215;
     look.y -= event.movementY * 0.00175;
   };
   const onPointerLockChange = () => {
-    if (!isTouch) emitLock(document.pointerLockElement === target);
+    if (isTouch) return;
+    if (document.pointerLockElement === target) virtual = false;
+    else if (virtual) return;
+    emitLock(document.pointerLockElement === target);
+  };
+  const onPointerLockError = () => {
+    if (!isTouch && !locked) forceStart();
+  };
+  const onVirtualKey = (event: KeyboardEvent) => {
+    if (virtual && event.code === "Escape") {
+      virtual = false;
+      emitLock(false);
+    }
+  };
+  const tryRealLock = () => {
+    if (virtual && document.pointerLockElement !== target) {
+      try {
+        target.requestPointerLock();
+      } catch {
+        /* sanal kilitle sürer */
+      }
+    }
+  };
+  const forceStart = () => {
+    if (locked || isTouch) return;
+    virtual = true;
+    emitLock(true);
   };
 
   document.addEventListener("keydown", onKeyDown);
   document.addEventListener("keyup", onKeyUp);
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("pointerlockchange", onPointerLockChange);
+  document.addEventListener("pointerlockerror", onPointerLockError);
+  document.addEventListener("keydown", onVirtualKey);
+  target.addEventListener("mousedown", tryRealLock);
   window.addEventListener("blur", onBlur);
 
   return {
@@ -62,8 +96,12 @@ export function createInput(target: HTMLElement): InputHandle {
         }
       }
     },
+    forceStart,
     releaseLock() {
-      if (isTouch) {
+      if (virtual) {
+        virtual = false;
+        emitLock(false);
+      } else if (isTouch) {
         emitLock(false);
       } else if (document.pointerLockElement === target) {
         void document.exitPointerLock();
@@ -103,6 +141,9 @@ export function createInput(target: HTMLElement): InputHandle {
       document.removeEventListener("keyup", onKeyUp);
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("pointerlockchange", onPointerLockChange);
+      document.removeEventListener("pointerlockerror", onPointerLockError);
+      document.removeEventListener("keydown", onVirtualKey);
+      target.removeEventListener("mousedown", tryRealLock);
       window.removeEventListener("blur", onBlur);
       listeners.clear();
     },

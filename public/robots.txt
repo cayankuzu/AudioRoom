@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://audio-room-ecru.vercel.app/sitemap.xml

@@ -1,0 +1,55 @@
+/* AudioRoom tasarım token'ları ve yazı tipleri — hub ve evrenler aynı kaynağı kullanır. */
+
+@font-face { font-family: "Manrope"; src: url("/fonts/manrope-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Manrope"; src: url("/fonts/manrope-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Manrope"; src: url("/fonts/manrope-800.woff2") format("woff2"); font-weight: 800; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("/fonts/plex-mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Cinzel"; src: url("/fonts/cinzel-400.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Sedgwick Ave Display"; src: url("/fonts/sedgwick-400.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Cormorant Garamond"; src: url("/fonts/cormorant-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Courier Prime"; src: url("/fonts/courier-prime-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Courier Prime"; src: url("/fonts/courier-prime-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  --ar-accent: #efe8dc;
+  --ar-accent-ink: #111;
+  --ar-accent-fill: #efe8dc;
+  --ar-accent-text: #efe8dc;
+  --ar-display: "Manrope", sans-serif;
+  --ar-font: "Manrope", system-ui, sans-serif;
+  --ar-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --ar-text: #f4f0e9;
+  --ar-muted: rgba(244, 240, 233, 0.66);
+  /* Koyu zeminde en az 4.5:1 kontrast (10–12 px metinler için). */
+  --ar-faint: rgba(244, 240, 233, 0.54);
+  --ar-glass: rgba(12, 12, 14, 0.72);
+  --ar-glass-strong: rgba(12, 12, 14, 0.9);
+  --ar-line: rgba(255, 255, 255, 0.1);
+  --ar-line-strong: rgba(255, 255, 255, 0.2);
+
+  --ar-space-1: 4px;
+  --ar-space-2: 8px;
+  --ar-space-3: 12px;
+  --ar-space-4: 16px;
+  --ar-space-5: 24px;
+  --ar-space-6: 32px;
+  --ar-space-7: 48px;
+
+  --ar-radius: 20px;
+  --ar-radius-sm: 12px;
+  --ar-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+
+  --ar-fast: 150ms;
+  --ar-normal: 260ms;
+  --ar-slow: 480ms;
+  --ar-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --ar-text-xs: 11px;
+  --ar-text-sm: 13px;
+  --ar-text-md: 15px;
+  --ar-text-lg: 18px;
+  --ar-text-xl: 28px;
+  --ar-text-2xl: clamp(34px, 5vw, 56px);
+}
+

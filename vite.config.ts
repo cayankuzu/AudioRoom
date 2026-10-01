@@ -1,71 +1,43 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { resolve } from "node:path";
 
 /**
- * AudioRoom — kök seviyede tek Vite uygulaması.
+ * AudioRoom: hub (kök index.html) + her evren `worlds/<ad>/index.html` (Sürüm 2).
+ * Yeni bir evren klasörü eklemek yeterlidir; burada değişiklik gerekmez.
  *
- * Multi-page setup:
- *   /                                              → Hub (kök index.html)
- *   /depo/redd/mukemmel_bosluk/                    → Redd · Mükemmel Boşluk
- *   /depo/henry_the_lee/kuantum_dolanıklığı/       → Henry the Lee · Kuantum Dolanıklığı
- *   /depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/ → Hayko Cepkin · Beni Büyüten Şarkılar Vol.1
- *
- * Her albüm kendi alt klasöründe yaşamaya devam eder; kök Vite onları
- * statik girdiler olarak servis eder. Tüm bağımlılıklar kök
- * `node_modules` içinden çözümlenir, böylece her albüm için ayrı
- * `npm install` gerekmez.
+ * Sürüm 1: evrenlerin ilk hâli, özgün kodu ve yollarıyla `depo/` altında korunur
+ * (asset'leri `public/assets`, `public/henry_the_lee`, `public/hayko_bbs_vol1`).
+ * Hub'daki sürüm seçici ikisine de götürür.
  */
+const root = fileURLToPath(new URL(".", import.meta.url));
+const worlds = readdirSync(`${root}worlds`).filter((name) => existsSync(`${root}worlds/${name}/index.html`));
+export const LEGACY_V1: Record<string, string> = {
+  "v1-mukemmel-bosluk": "depo/redd/mukemmel_bosluk",
+  "v1-kuantum-dolaniklik": "depo/henry_the_lee/kuantum_dolanıklığı",
+  "v1-klostrofobik-kaplumbaga": "depo/henry_the_lee/klostrofobik_kaplumbaga",
+  "v1-beni-buyuten-sarkilar": "depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1",
+};
+const { version } = JSON.parse(readFileSync(`${root}package.json`, "utf8")) as { version: string };
+
 export default defineConfig({
   base: "./",
-  /**
-   * Yalnızca bu HTML girişlerinden import taranırsın; taşınmış `redd/` yolları
-   * gibi eski `node_modules` konumlarına takılı kalan Vite önbelleği riski azalır.
-   */
-  optimizeDeps: {
-    entries: [
-      "index.html",
-      "depo/redd/mukemmel_bosluk/index.html",
-      "depo/henry_the_lee/kuantum_dolanıklığı/index.html",
-      "depo/henry_the_lee/klostrofobik_kaplumbaga/index.html",
-      "depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/index.html",
-    ],
-    exclude: ["three", "troika-three-text"],
-  },
-  server: {
-    host: true,
-    port: 5173,
-    watch: {
-      ignored: [
-        "**/*-check.png",
-        "**/*-portrait.png",
-        "**/*-landscape.png",
-        "**/vite-*.log",
-      ],
-    },
-    fs: {
-      allow: [".."],
-    },
-  },
+  // Tek sürüm kaynağı: package.json.
+  define: { __APP_VERSION__: JSON.stringify(version) },
+  server: { host: true, port: 5173 },
+  // three saf ESM'dir; ön paketlemeye gerek yok (bu makinede esbuild'in
+  // node_modules dosyalarını okuyamadığı durumlarda da sunucu ayakta kalır).
+  optimizeDeps: { exclude: ["three"] },
   build: {
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
+      // three.js tüm evrenlerde ortak: ayrı dosya, tarayıcı önbelleğinde bir kez.
+      // three.js ayrı ve önbelleklenebilir; hub (yalnızca albüm verisi) onu hiç yüklemez.
+      output: { manualChunks: { three: ["three"] } },
       input: {
-        hub: resolve(__dirname, "index.html"),
-        mukemmel_bosluk: resolve(
-          __dirname,
-          "depo/redd/mukemmel_bosluk/index.html"
-        ),
-        kuantum_dolaniklik: resolve(
-          __dirname,
-          "depo/henry_the_lee/kuantum_dolanıklığı/index.html"
-        ),
-        klostrofobik_kaplumbaga: resolve(
-          __dirname,
-          "depo/henry_the_lee/klostrofobik_kaplumbaga/index.html"
-        ),
-        hayko_beni_buyuyen_v1: resolve(
-          __dirname,
-          "depo/hayko_cepkin/Beni_Büyüten_Şarkılar_Vol.1/index.html"
-        ),
+        hub: `${root}index.html`,
+        ...Object.fromEntries(worlds.map((name) => [name, `${root}worlds/${name}/index.html`])),
+        ...Object.fromEntries(Object.entries(LEGACY_V1).map(([name, dir]) => [name, `${root}${dir}/index.html`])),
       },
     },
   },

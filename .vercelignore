@@ -1,0 +1,7 @@
+# Vercel CLI yüklemesinden hariç tutulanlar (derleme Vercel üzerinde yapılır).
+.env*
+.claude
+dist
+test-results
+playwright-report
+assets-src

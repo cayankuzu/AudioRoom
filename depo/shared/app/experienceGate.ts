@@ -7,6 +7,8 @@ import { readInputDeviceProfile } from "./inputDeviceProfile";
 
 export interface ExperienceLockHandle {
   requestLock(): void;
+  /** Fare kilidi alınamazsa (reddedildi, Esc sonrası bekleme, iframe) oyunu sürükle-bak ile başlatır. */
+  forceStart?(): void;
   releaseLock(): void;
   onLockChange(cb: (locked: boolean) => void): () => void;
 }
@@ -122,6 +124,11 @@ export function bindExperienceGate(options: ExperienceGateOptions): () => void {
     fullscreenRejected = false;
     options.overlay.setGateState(null);
     options.experience.requestLock();
+    // Tarayıcı fare kilidini vermezse (masaüstü uygulama paneli, Esc'den hemen sonra, iframe) düğme ölü kalmasın:
+    // kısa bir bekleyişten sonra oyun sürükle-bak ile başlar; canvas'a tıklayınca gerçek kilit yeniden denenir.
+    window.setTimeout(() => {
+      if (!locked && !hasStarted) options.experience.forceStart?.();
+    }, 700);
   };
 
   options.overlay.onStart(() => {

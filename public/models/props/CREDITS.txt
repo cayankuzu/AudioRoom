@@ -1,0 +1,21 @@
+Hazır 3D modeller — Poly Haven (https://polyhaven.com), lisans: CC0 1.0 (kamu malı; atıf gerekmez).
+Kaynaktan 1k glTF olarak indirildi; gltf-transform ile sadeleştirildi (meshopt, 512–1024 px WebP doku).
+
+moon_rock_01, moon_rock_03, moon_rock_06     — Mükemmel Boşluk krater kayaları
+dutch_ship_medium, dutch_ship_large_02         — Kalpsiz Romantik gemileri (kırmızı yelkenli: large_02)
+sofa_02, vintage_day_bed, dining_chair_02      — Sextronot (havadaki ev, masadaki iki sandalye)
+television_02, wall_clock, alarm_clock_01,
+vintage_suitcase, woodenchair_01,
+vintage_microwave, book_encyclopedia_set_01    — Kafakafka (kratere saçılmış ev)
+metal_jerrycan                                 — İtiraf (benzin bidonu)
+barrel_01, wooden_crate_01, wooden_lantern_01  — Kalpsiz Romantik iskelesi (fıçılar, sandıklar, fenerler)
+painted_wooden_bench                           — Tam Bi Delilik (uçurumun kenarındaki bank)
+
+Genişletilmiş kütüphane (27.09.2026, 211 model daha; hepsi Poly Haven, CC0):
+- Mükemmel Boşluk: şarkı başına set döşemesi (worlds/mukemmel-bosluk/songs/dressing.ts) — kıyı eşyaları, çalışma masası,
+  laboratuvar takımları, müze deposu, durmuş saatler, yanmış orman, ev eşyaları, sessiz şehir, fırlatma sahası, şamdanlar,
+  parti kalıntıları, yol boyu anılar; kraterin siyahına uydurulmuş (solgun, koyu).
+- Beni Büyüten Şarkılar: gölge oyunu silüetleri (worlds/beni-buyuten-sarkilar/props.ts SILHOUETTES) — ışıksız siyah.
+- Kuantum Dolanıklık: mürekkep çizgisi eşyalar ve ikizleri (satranç, kara tahta, dart, vantilatör, mikroskoplar…).
+- Klostrofobik Kaplumbağa: kâğıdın kenarında dev piknik (masa, kâse, kaşık, limon, kruvasan, pasta, süzgeç, fare, kapan…).
+Kullanılmayan modeller de kütüphanede durur; yalnızca ilgili evren/şarkı yüklenirken indirilir.

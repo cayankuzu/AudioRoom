@@ -34,6 +34,8 @@ import { createPlayerRecord } from "../world/playerRecord";
 export interface KlostrofobikExperience {
   readonly ready: Promise<void>;
   requestLock(): void;
+  /** Fare kilidi alınamazsa sürükle-bak ile başlat. */
+  forceStart?(): void;
   releaseLock(): void;
   onLockChange(cb: (locked: boolean) => void): () => void;
   dispose(): void;
@@ -993,6 +995,7 @@ export function startExperience(
   return {
     ready,
     requestLock: () => input.requestLock(),
+    forceStart: () => input.forceStart(),
     releaseLock: () => input.releaseLock(),
     onLockChange: (callback) => input.onLockChange(callback),
     dispose() {

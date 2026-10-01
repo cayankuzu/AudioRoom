@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sayfa bulunamadı · AudioRoom</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #070708; color: #f4f0e9; font-family: system-ui, sans-serif; }
+      main { min-height: 100%; display: grid; place-items: center; padding: 24px; text-align: center; }
+      h1 { margin: 0 0 8px; font-weight: 600; font-size: clamp(28px, 6vw, 44px); }
+      p { margin: 0 0 24px; color: rgba(244, 240, 233, 0.66); line-height: 1.6; }
+      a { display: inline-flex; align-items: center; min-height: 46px; padding: 0 24px; border-radius: 999px; background: #efe8dc; color: #111; font-weight: 600; text-decoration: none; }
+    </style>
+    <script>
+      // Eski evren adreslerini (depo/...) yeni adreslere yönlendirir.
+      (function () {
+        var path = decodeURIComponent(window.location.pathname);
+        var legacy = [
+          ["/depo/redd/mukemmel_bosluk", "worlds/mukemmel-bosluk/"],
+          ["/depo/hayko_cepkin/", "worlds/beni-buyuten-sarkilar/"],
+          ["/depo/henry_the_lee/kuantum", "worlds/kuantum-dolaniklik/"],
+          ["/depo/henry_the_lee/klostrofobik_kaplumbaga", "worlds/klostrofobik-kaplumbaga/"],
+        ];
+        for (var i = 0; i < legacy.length; i += 1) {
+          var at = path.indexOf(legacy[i][0]);
+          if (at >= 0) {
+            window.location.replace(path.slice(0, at + 1) + legacy[i][1]);
+            return;
+          }
+        }
+        // GitHub Pages proje sitesi /<repo>/ altında yayınlanır; ana sayfa bağlantısı ona göre kurulur.
+        var repo = /\.github\.io$/.test(window.location.hostname) ? path.split("/")[1] : "";
+        window.AUDIOROOM_HOME = repo ? "/" + repo + "/" : "/";
+      })();
+    </script>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>Bu sayfa bulunamadı</h1>
+        <p>Aradığın evren taşınmış ya da hiç var olmamış olabilir.</p>
+        <a id="home" href="/">AudioRoom'a dön</a>
+      </div>
+    </main>
+    <script>
+      document.getElementById("home").href = window.AUDIOROOM_HOME || "/";
+    </script>
+  </body>
+</html>

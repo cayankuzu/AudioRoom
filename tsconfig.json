@@ -4,27 +4,16 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": false,
+    "noUnusedParameters": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "allowJs": false,
     "isolatedModules": true,
     "resolveJsonModule": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "depo/henry_the_lee/**/src/**/*.ts",
-    "depo/hayko_cepkin/**/src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "depo/redd/mukemmel_bosluk/node_modules",
-    "depo/redd/mukemmel_bosluk/src"
-  ]
+  "include": ["src/**/*.ts", "engine/**/*.ts", "worlds/**/*.ts", "tests/**/*.ts", "*.config.ts"]
 }

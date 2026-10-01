@@ -9,5 +9,5 @@ dist-ssr
 .idea
 .vercel
 .env*
-/**/meshy_bee.glb
-/**/meshy_daisy.glb
+test-results
+playwright-report

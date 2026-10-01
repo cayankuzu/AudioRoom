@@ -1,0 +1,20 @@
+Karakter kütüphanesi (public/models/characters/)
+
+man.glb, woman.glb — Quaternius, "Universal Base Characters" (Standard), CC0 1.0.
+  Kaynak: https://quaternius.com/packs/universalbasecharacters.html
+  Superhero Male / Superhero Female gövdeleri, saç (Head kemiğine bağlı), gözler; Unreal kemik adları
+  (root, pelvis, spine_01…, hand_r, hand_l, Head). Meshopt ile sıkıştırıldı (gltf-transform).
+  outfits/*.webp — taban ten dokusunun üstüne, kemik ağırlıklarından türetilen bölge maskeleriyle boyanmış
+  kıyafetler (man_hero, man_plain, man_dark, man_black; woman_red, woman_white, woman_blue, woman_ochre,
+  woman_muted). Saç rengi çalışma zamanında koyulaştırılır (adam koyu, kadın koyu kahve).
+
+mannequin_m.glb, mannequin_f.glb — Quaternius, "Universal Animation Library" (Standard),
+  CC0 1.0. Kaynak: https://quaternius.com/packs/universalanimationlibrary.html
+  glTF dağıtımı: https://github.com/J-Ponzo/gltf-universal-animation-library
+  Manken gövdeleri; aynı evrensel insansı rig.
+
+ual1.glb, ual2.glb — Quaternius, "Universal Animation Library" (Standard), CC0 1.0.
+  86 klip (Idle_Loop, Walk_Loop, Run_Loop, Sitting_Idle_Loop, Crouch_Idle_Loop, Push_Loop, Fixing_Kneeling,
+  Sword_Regular_Combo, Sword_Attack, Idle_FoldArms_Loop, Death…); düğüm adıyla bütün modellere bağlanır.
+
+Bütün varlıklar CC0 1.0 Universal (kamu malı adaması); atıf zorunlu değildir, teşekkür olarak yazılmıştır.

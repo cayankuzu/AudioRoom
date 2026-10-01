@@ -56,6 +56,8 @@ import {
 
 export interface ExperienceHandle {
   requestLock(): void;
+  /** Fare kilidi alınamazsa sürükle-bak ile başlat. */
+  forceStart?(): void;
   releaseLock(): void;
   onLockChange(cb: (locked: boolean) => void): () => void;
   dispose(): void;
@@ -756,6 +758,10 @@ export function startExperience(container: HTMLElement): ExperienceHandle {
 
   return {
     requestLock: requestExperienceLock,
+    forceStart: () => {
+      ambient.start();
+      input.forceStart();
+    },
     releaseLock: () => input.releaseLock(),
     onLockChange: (cb) =>
       input.onLockChange((nextLocked) => {
