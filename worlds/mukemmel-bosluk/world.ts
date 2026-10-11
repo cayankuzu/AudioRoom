@@ -304,7 +304,7 @@ export const world: WorldDefinition = {
       prompt: () => stage.prompt(),
       // Çekimler zamana göre sıralı verilir (sahneler ek çekimleri listenin sonuna ekleyebilir).
       // Yazısız filmler (sahibin kuralı): klibin başında ve sonunda şarkı adı kartı çıkmaz.
-      filmCard: (trackId) => trackId !== "kaniyorduk" && trackId !== "kalpsiz-romantik",
+      filmCard: (trackId) => trackId !== "kaniyorduk" && trackId !== "kalpsiz-romantik" && trackId !== "ask-virus",
       shots: (trackId) => {
         const list = songs.scenes[trackId]?.shots;
         if (!list) return null;

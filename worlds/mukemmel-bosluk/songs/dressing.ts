@@ -33,19 +33,7 @@ export const SONG_DRESSING: Record<string, (kit: SceneKit) => Placement[]> = {
   ],
   // Defterin çevresi bir çalışma masasının dağınıklığı: kitaplar, notlar, gözlük, projeksiyon, çıkrık (kader).
   kaniyorduk: () => [],  // Film kendi odasını ve kırını kurar.
-  // Laboratuvar: kordonun içinde bırakılmış deney takımları, mikroskoplar, gaz maskesi.
-  "ask-virus": (kit) => [
-    P("chemistry_set", 12, 26, 1.4, { yaw: 0.4, solid: true }),
-    P("bunsen_burner", 13.6, 24.2, 0.5, { yaw: 0.1 }),
-    P("industrial_microscope", -14, 30, 0.9, { yaw: 2.5, solid: true }),
-    P("vintage_microscope", 26, -18, 0.8, { yaw: 0.9 }),
-    P("medical_box", -24, -22, 0.7, { yaw: 1.7 }),
-    P("medical_tape", -25.2, -20.8, 0.3),
-    P("magnifying_glass_01", 30, 6, 0.7, { yaw: 0.6, tilt: -0.2 }),
-    P("old_gas_mask", -30, 12, 0.6, { yaw: 2.9, tilt: 0.4 }),
-    P("metal_toolbox", 38, 30, 0.8, { yaw: 1.2 }),
-    ...scatter(kit.random, ["medical_box", "metal_toolbox", "old_gas_mask", "bunsen_burner"], 10, { cx: 0, cz: 0, r0: 24, r1: 62 }, [0.5, 0.9], AVOID),
-  ],
+  "ask-virus": () => [],  // Film kendi arşivini kurar; kraterde laboratuvar eşyası yok.
   // Müze deposu: heykel başları, büstler, vazolar, boş çerçeveler, merdiven — sergilenmeyen kalpler.
   "onlar-bile-uzulurler": (kit) => [
     P("marble_bust_01", STAGE.x - 20, STAGE.z + 4, 1.6, { yaw: 1.2, solid: true, round: true }),

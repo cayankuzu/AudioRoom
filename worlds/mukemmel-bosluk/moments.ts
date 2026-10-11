@@ -97,11 +97,18 @@ export const MOMENTS: Record<string, Moment> = {
     fogDensity: 0.0022,
     dust: { color: "#8d93a0", opacity: 0.08, size: 0.08, velocity: [0, 0.03, 0], turbulence: 0.2 },
   }),
+  // Arşiv: steril, soğuk-nötr gün ışığı; iç mekân okunsun diye hemi yüksek (figürler aynı oranda kısılır); toz yok denecek kadar az.
   "ask-virus": m({
-    skyTop: "#cfc9c9",
-    skyHorizon: "#f3ecec",
-    tint: "#fff1f1",
-    dust: { color: "#c80d18", opacity: 1, size: 0.34, velocity: [0.3, 0.25, 0.1], turbulence: 1.8 },
+    skyTop: "#d9dadc",
+    skyHorizon: "#f6f6f4",
+    skyIntensity: 1.08,
+    fog: "#eeeeee",
+    fogDensity: 0.0012,
+    hemi: 2.4,
+    sun: 1.6,
+    saturation: 0.96,
+    tint: "#ffffff",
+    dust: { color: "#d6d6da", opacity: 0.12, size: 0.08, velocity: [0.05, 0.02, 0.02], turbulence: 0.2 },
   }),
   "onlar-bile-uzulurler": m({
     skyTop: "#8e8f91",

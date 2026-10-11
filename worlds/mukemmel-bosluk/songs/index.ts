@@ -24,6 +24,7 @@ export interface ReddScenes {
 /** Şarkı sahnelerinin kullandığı hazır modeller (Poly Haven, CC0); yalnızca istenen şarkılarınki yüklenir. */
 export const SONG_MODELS: Readonly<Record<string, readonly string[]>> = {
   kaniyorduk: ["painted_wooden_table", "dining_chair_02"],
+  "ask-virus": ["pocket_watch", "round_spectacles", "vintage_lighter", "cigarette_case", "seadogs_compass", "postcard_set_01", "ceramic_vase_01", "brass_goblets", "tea_set_01", "lambis_shell", "camera_01", "cassette_player", "alarm_clock_01", "binder_notebook", "mantel_clock_01", "jug_01"],
   "kalpsiz-romantik": ["dutch_ship_medium", "wine_barrel_01", "wooden_crate_01", "wooden_lantern_01"],
   kafakafka: ["dining_chair_02", "television_02", "vintage_suitcase", "book_encyclopedia_set_01", "vintage_microwave", "woodenchair_01", "wall_clock", "alarm_clock_01"],
   sextronot: ["sofa_02", "vintage_day_bed", "dining_chair_02"],

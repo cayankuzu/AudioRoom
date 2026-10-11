@@ -10,7 +10,7 @@ import type { FigurePose } from "./figure";
  * Bir kez yüklenir; her figür modelin iskeletli bir kopyasını giyer. Yüklenemezse figürler kapsül rigde kalır.
  */
 export type CharacterKind = "man" | "woman" | "mannequin" | "mannequinF";
-export type Outfit = "man_hero" | "man_plain" | "man_dark" | "man_black" | "man_white" | "woman_red" | "woman_white" | "woman_blue" | "woman_ochre" | "woman_muted" | "woman_stone";
+export type Outfit = "man_hero" | "man_plain" | "man_dark" | "man_black" | "man_white" | "man_graphite" | "woman_red" | "woman_white" | "woman_blue" | "woman_ochre" | "woman_muted" | "woman_stone" | "woman_burgundy";
 
 interface Model {
   scene: THREE.Group;
