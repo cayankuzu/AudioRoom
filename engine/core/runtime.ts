@@ -7,6 +7,11 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { lowerTier, QUALITY_PROFILES, resolveProfile, type QualityMode, type QualityProfile } from "./quality";
 
+/** Tek oyun adımının üst sınırı (sn): kare bundan uzun sürerse oyun eşit alt adımlarla ilerler. */
+const MAX_STEP = 1 / 20;
+/** Bir karede yakalanan en uzun gerçek süre (sn): gizlenen sekme ya da uzun takılma sonrası gerisi bırakılır. */
+const MAX_CATCH_UP = 0.5;
+
 /**
  * Son görüntü ayarı (sRGB uzayında): parlaklık, kontrast, doygunluk, ton, vinyet, grain, kararma.
  * Üstünde klibin kendi renk katmanı durur (`uClip*`): sinema kamerası her çekime ayrı renk,
@@ -385,15 +390,23 @@ export function createRuntime(
     if (profile.shadows && profile.shadowInterval > 0 && frameCount % profile.shadowInterval === 0) {
       renderer.shadowMap.needsUpdate = true;
     }
-    const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+    // Karede geçen gerçek süre; sekme gizlenip dönünce ya da uzun bir takılmada en çok MAX_CATCH_UP yakalanır.
+    const frameDt = last ? Math.min((now - last) / 1000, MAX_CATCH_UP) : 1 / 60;
     last = now;
     if (!runtime.paused) {
-      elapsed += dt;
-      for (const update of updaters) update(dt, elapsed);
+      // Kare MAX_STEP'ten uzun sürdüyse (zayıf GPU, yazılım çizici) oyun birkaç eşit küçük adımla gerçek
+      // zamana yetişir: müzik gerçek zamanda akar, sahne, karakterler ve geçişler ondan geri kalmaz.
+      // Adım boyu hiç büyümez; fizik ve yaklaşma eğrileri 60 kare/sn'deki gibi davranır.
+      const steps = Math.ceil(frameDt / MAX_STEP);
+      const dt = frameDt / steps;
+      for (let i = 0; i < steps; i += 1) {
+        elapsed += dt;
+        for (const update of updaters) update(dt, elapsed);
+      }
     }
     grade.uTime.value = elapsed;
-    adaptResolution(dt);
-    composer?.render(dt);
+    adaptResolution(frameDt);
+    composer?.render(frameDt);
     if (meterState.on && !meterState.pending && frameCount % 10 === 0) measure();
   };
 

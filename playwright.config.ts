@@ -17,6 +17,8 @@ export default defineConfig({
   testDir: "tests/e2e",
   timeout: 90_000,
   retries: process.env.CI ? 1 : 0,
+  // GPU'suz çalıştırıcıda (SwiftShader) kare 300–500 ms sürer: istem/sınıf beklemelerine iki kat pay.
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   // Üç boyutlu sayfalar ağır: çok işçi kare hızını düşürür, oyun zamanı gerçek zamandan geri kalır ve süreye bağlı testler oynar.
   workers: process.env.CI ? 1 : 2,
   reporter: process.env.CI ? "github" : "list",

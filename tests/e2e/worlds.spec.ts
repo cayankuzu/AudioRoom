@@ -108,6 +108,13 @@ test("Klostrofobik Kaplumbağa: tavşan plağı taşır, kabuk ve tünel çalı�
   expect(errors).toEqual([]);
 });
 
+/**
+ * Her sahnenin sınandığı şarkı saniyesi: hikâyenin o anında en az bir eylem açık olmalı.
+ * Kalpsiz Romantik'te deniz 55. saniyeden sonra çekilir (gemiler denizdeyken sınanır);
+ * Kanıyorduk'ta tek etkileşim penceresi aydır (60–77 sn); ötekilerde şarkının ortası.
+ */
+const SCENE_TEST_AT: Record<string, number> = { "kalpsiz-romantik": 20, kaniyorduk: 65 };
+
 test("Mükemmel Boşluk: her şarkının kendi sahnesi açılır ve etkileşimi çalışır", async ({ page }) => {
   test.setTimeout(180_000);
   await fakeYouTube(page);
@@ -121,10 +128,14 @@ test("Mükemmel Boşluk: her şarkının kendi sahnesi açılır ve etkileşimi 
       if (r.state !== "held") a.pickUp(r);
       a.ctx.placeOnGramophone(a.records.held);
       return 1;`);
-    // Şarkının ortasına sar: hikâyenin o anındaki eylemler açık olmalı.
-    await page.waitForTimeout(300);
-    // Kalpsiz Romantik'te deniz 55. saniyeden sonra çekilir; gemiler denizdeyken sınanır.
-    await seek(page, id === "kalpsiz-romantik" ? 20 : 100);
+    // Parça yüklenip çalmaya başlasın: yüklenme şarkının saatini sıfırlar, sarma ondan sonra yapılmalı
+    // (yavaş çizicide sabit bir bekleme yetmiyordu ve test bir önceki saniyenin eylemiyle geçiyordu).
+    await expect
+      .poll(() => game<string>(page, `return a.music.state + ":" + (a.music.track ? a.music.track.id : "");`), { timeout: 15_000 })
+      .toBe(`playing:${id}`);
+    const at = SCENE_TEST_AT[id] ?? 100;
+    await seek(page, at);
+    await expect.poll(() => game<number>(page, `return a.ctx.songTime();`), { timeout: 10_000 }).toBeGreaterThan(at - 2);
     // Sahne kurulunca (deniz dolar, sahne görünür olur) şarkıya özel eylemler açılır.
     await expect
       .poll(
@@ -145,6 +156,8 @@ test("Mükemmel Boşluk: her şarkının kendi sahnesi açılır ve etkileşimi 
 
 test("Beni Büyüten Şarkılar: şarkı çalarken zardaki anıya dokunulur, bebek tekmeler", async ({ page }) => {
   const errors = collectErrors(page);
+  // Sınanan şey anı etkileşimi; gerçek YouTube ağa bağlıdır (CI'da parça açılamayınca "çalınamadı" ipucu dokunuş ipucunu eziyordu).
+  await fakeYouTube(page);
   await enterWorld(page, "/worlds/beni-buyuten-sarkilar/");
   await game(page, `const r = a.records.list[0]; a.pickUp(r); a.ctx.placeOnGramophone(a.records.held); return 1;`);
   // Oyuncu perdeye yaklaşıp (anı kabarcıkları merkezin çevresinde r 7–19'da döner; nişan çizgisini kesmesinler)
